@@ -430,20 +430,21 @@ def flag_metastable(conn):
 
 
 create_zeta_table_stmt = """
-CREATE TABLE zeta
+CREATE TABLE zeta(
     id integer primary key,
     atom integer,
     ion integer,
-    zeta float_ndarray"""
+    zeta float_ndarray)"""
 
 def read_zeta(conn):
     print "reading zeta values and inserting into db from %s" % zeta_datafile
-    zeta_data = loadtxt(zeta_datafile, usecols=arange(1,23), dtype=np.float64)
+    zeta_data = np.loadtxt(zeta_datafile, usecols=xrange(1,23), dtype=np.float64)
+    conn.execute(create_zeta_table_stmt)
     for line in zeta_data:
         atom = int(line[0])
         ion = int(line[1])
         z_data = line[2:]
-        conn.execute('insert into table zeta(atom, ion, zeta) values(?, ?, ?)',
+        conn.execute('insert into zeta(atom, ion, zeta) values(?, ?, ?)',
                      (atom, ion, sqlite3.Binary(z_data.tostring())))
     conn.commit()
     return conn
