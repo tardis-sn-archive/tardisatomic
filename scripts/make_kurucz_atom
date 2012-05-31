@@ -1,0 +1,15 @@
+#!/usr/bin/env
+import os
+from tardisatomic import construct_atom_db
+select_atoms = (6, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30)
+dbname = 'test.db3'
+os.system('rm test.db3')
+conn = construct_atom_db.new_linelist_from_gfall(dbname, select_atom=select_atoms, loggf_threshold=-3)
+conn = construct_atom_db.create_levels(conn)
+conn = construct_atom_db.link_levels(conn)
+conn = construct_atom_db.create_temporary_transition_table(conn)
+conn = construct_atom_db.create_macro_atom(conn)
+conn = construct_atom_db.flag_metastable(conn)
+conn = read_zeta(conn)
+conn.close()
+conn.close()

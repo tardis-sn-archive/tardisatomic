@@ -1,11 +1,17 @@
 import os
 import sqlite3
 import math
-
+import numpy as np
 import macro_atom_transition
 
 gfall_db = os.path.join(os.path.dirname(__file__), 'data', 'gfall.db3')
+zeta_datafile = os.path.join(os.path.dirname(__file__), 'data', 'knox_long_recombination_zeta.dat')
 
+try:
+    import sqlparse
+    sqlparse_available = True
+except ImportError:
+    sqlparse_available = False
 
 
 #constants
@@ -27,8 +33,10 @@ SELECT
     label_lower
 FROM
     kurucz_lines.gfall
+
 WHERE
     loggf > %(loggf_thresh).2f
+    %(where_stmt)s
 """
 
 linelist_insert_stmt = """
@@ -91,7 +99,14 @@ def new_linelist_from_gfall(new_dbname, gfall_fname=None, loggf_threshold=-5, se
         elem_select_stmt = ""
     else:
         elem_select_stmt = " and elem in (%s)" % (','.join(map(str, select_atom)),)
-    curs.execute(linelist_insert_stmt + linelist_select_stmt % {'hc':hc, 'loggf_thresh':loggf_threshold} + elem_select_stmt)
+    insert_fromgfall_stmt = linelist_insert_stmt + linelist_select_stmt % {'hc':hc, 'loggf_thresh':loggf_threshold, 'where_stmt':elem_select_stmt} 
+    
+    if sqlparse_available:
+        print sqlparse.format(insert_fromgfall_stmt, reindent=True)
+    else:
+        print insert_fromgfall_stmt
+    
+    curs.execute(insert_fromgfall_stmt)
     
     conn.commit()
     print "%d lines in database" % (conn.execute('select count(atom) from lines').fetchone()[0])
@@ -161,6 +176,7 @@ def create_levels(conn):
             i=0
         conn.execute('insert into levels(atom, ion, energy, g, label, level_id) values(?, ?, ?, ?, ?, ?)', (atom, ion, energy, g , label, i)) 
     conn.execute('create index level_unique_idx on levels(atom, ion, energy, g, label)')
+    conn.execute('create index level_global_idx on levels(id)')
     conn.commit()
     return conn
 
@@ -367,11 +383,10 @@ SET
     p_internal_%(trans_type)s = ?
     %(p_emission_stmt)s
 WHERE
-    count_%(trans_type)s isnull
-                        """
+    reference_%(trans_type)s isnull"""
 
 def create_macro_atom(conn):
-    empty_array = sqlite3.Binary('')
+    empty_array = -1
     curs = conn.cursor()
     print "Creating and populating the macro atom table"
     curs.execute('drop table if exists macro_atom')    
@@ -386,7 +401,50 @@ def create_macro_atom(conn):
     
     curs.execute(update_macro_atom_clean % dict(trans_type='up', p_emission_stmt=''),
                     (empty_array, empty_array, empty_array))
+    conn.execute('create index macro_atom_global_idx on macro_atom(id)')
+    conn.commit()
+    return conn
     
+def flag_metastable(conn):
+    flag_metastable_stmt = """
+    UPDATE
+        levels
+    SET
+        metastable=(SELECT CASE
+                    WHEN
+                        count_down = 0
+                    THEN 1
+                    WHEN
+                        count_down > 0
+                    THEN 0
+                    END
+              FROM
+                macro_atom
+              WHERE
+                macro_atom.id=levels.id)
+    """
+    print "Flagging metastable levels"
+    conn.execute(flag_metastable_stmt)
+    conn.commit()
+    return conn
+
+
+create_zeta_table_stmt = """
+CREATE TABLE zeta
+    id integer primary key,
+    atom integer,
+    ion integer,
+    zeta float_ndarray"""
+
+def read_zeta(conn):
+    print "reading zeta values and inserting into db from %s" % zeta_datafile
+    zeta_data = loadtxt(zeta_datafile, usecols=arange(1,23), dtype=np.float64)
+    for line in zeta_data:
+        atom = int(line[0])
+        ion = int(line[1])
+        z_data = line[2:]
+        conn.execute('insert into table zeta(atom, ion, zeta) values(?, ?, ?)',
+                     (atom, ion, sqlite3.Binary(z_data.tostring())))
     conn.commit()
     return conn
     

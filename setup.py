@@ -1,4 +1,4 @@
-#setup script for DIT software
+#setup script for tardissatomic
 
 try:
     from setuptools import setup
@@ -18,12 +18,12 @@ except ValueError:
 	pass
 
 
-setup(name='dits',
-	  description='DIT Software - Pipeline and operation software for the DIT',
-	  author='The DIT collaboration',
-      version=version,
-      packages=['dits'],
-      package_data={'dits': ['data/*']},
-      scripts=scripts
+setup(name='tardisatomic',
+    description='Atomic data for the TARDIS SN synthesis program',
+    author='Wolfgang Kerzendorf (wkerzendorf@gmail.com)',
+    version=version,
+    packages=['tardisatomic'],
+    package_data={'tardisatomic': ['data/*']},
+    scripts=scripts
       )
       
