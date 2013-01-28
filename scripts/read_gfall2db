@@ -1,0 +1,36 @@
+#!/usr/bin/env python
+
+import argparse
+import tardisatomic
+from tardisatomic import fileio
+import os
+import sqlite3
+
+gfall_schema_path = os.path.join(os.path.dirname(tardisatomic.__file__), 'data', 'gfall.db3.schema')
+
+gfall_schema = file(gfall_schema_path).read()
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('gfall_file')
+parser.add_argument('gfall_db')
+
+args = parser.parse_args()
+
+print "Reading File %s" % args.gfall_file
+gfall_raw = fileio.readGFALLRaw(args.gfall_file)
+
+
+conn = sqlite3.connect(args.gfall_db)
+conn.execute('drop table if exists gfall')
+conn.commit()
+
+conn.executescript(gfall_schema)
+
+print "Inserting data into the DB %s" % args.gfall_db
+
+fileio.GFAllRaw2DB(gfall_raw, conn)
+
+conn.commit()
+conn.close()
+
