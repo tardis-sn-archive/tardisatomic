@@ -160,7 +160,9 @@ def create_levels(conn):
     curs = conn.cursor()
     curs.execute('drop table if exists levels')
     curs.execute(level_create_stmt)
-
+    add_full_ionized_levels ="""
+INSERT INTO levels (atom,ion,energy,g)   SELECT DISTINCT atom,atom,0,1 FROM levels WHERE NOT EXISTS (SELECT * FROM levels WHERE atom == ion)
+"""
     
     curs = conn.execute(level_select_stmt)
     
@@ -177,6 +179,7 @@ def create_levels(conn):
         conn.execute('insert into levels(atom, ion, energy, g, label, level_id) values(?, ?, ?, ?, ?, ?)', (atom, ion, energy, g , label, i)) 
     conn.execute('create index level_unique_idx on levels(atom, ion, energy, g, label)')
     conn.execute('create index level_global_idx on levels(id)')
+    conn.execute(add_full_ionized_levels)
     conn.commit()
     return conn
 
@@ -333,7 +336,7 @@ SET count_down =
         down_transitions.id=macro_atom.id),
     line_id_down = 
     (select 
-        line_id_down 
+        line_id_down
      from
         down_transitions
      where
@@ -355,6 +358,8 @@ SET count_down =
      where
         down_transitions.id=macro_atom.id)
     """
+
+
 
 
 def create_temporary_transition_table(conn):
