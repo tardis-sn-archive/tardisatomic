@@ -161,9 +161,9 @@ def create_levels(conn):
     curs.execute('drop table if exists levels')
     curs.execute(level_create_stmt)
     add_full_ionized_levels ="""
-INSERT INTO levels (atom,ion,energy,g)   SELECT DISTINCT atom,atom,0,1 FROM levels WHERE NOT EXISTS (SELECT * FROM levels WHERE atom == ion)
+INSERT INTO levels (atom,ion,energy,g,metastable,level_id)   SELECT DISTINCT atom,atom,0,1,1,(100*(atom*100+atom)) FROM levels WHERE NOT EXISTS (SELECT * FROM levels WHERE atom == ion)
 """
-    
+   #TODO: The level id is not nice, but necessary for the make_kurucz_hdf5.
     curs = conn.execute(level_select_stmt)
     
     old_atom = None
@@ -179,6 +179,7 @@ INSERT INTO levels (atom,ion,energy,g)   SELECT DISTINCT atom,atom,0,1 FROM leve
         conn.execute('insert into levels(atom, ion, energy, g, label, level_id) values(?, ?, ?, ?, ?, ?)', (atom, ion, energy, g , label, i)) 
     conn.execute('create index level_unique_idx on levels(atom, ion, energy, g, label)')
     conn.execute('create index level_global_idx on levels(id)')
+    print('Creating fully ionized levels')
     conn.execute(add_full_ionized_levels)
     conn.commit()
     return conn
@@ -192,7 +193,7 @@ def link_levels(conn):
             level_id_upper = 
             (select level_id from levels
                 where lines.atom=levels.atom and
-                    lines.ion=levels.ion and
+                lines.ion=levels.ion and
                     lines.e_upper=levels.energy and
                     lines.g_upper=levels.g and
                     lines.label_upper=levels.label),
