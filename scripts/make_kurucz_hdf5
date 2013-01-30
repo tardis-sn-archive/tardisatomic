@@ -97,7 +97,7 @@ print line_list_sql_stmt
 line_list_dtype = [('line_id', np.int), ('wavelength', np.float), ('atomic_number', np.int), ('ion_number', np.int), ('f_ul', np.float),
                    ('f_lu', np.float), ('level_number_lower', np.int), ('level_number_upper', np.int)]
 
-line_list_units = ('1', 'angstrom', '1', '1', '1', '1', '1', '1', '1', '1')
+line_list_units = ('1', 'angstrom', '1', '1', '1', '1', '1', '1')
 line_list = conn.execute(line_list_sql_stmt).fetchall()
 line_list = np.array(line_list, dtype=line_list_dtype)
 
