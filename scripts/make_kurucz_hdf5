@@ -212,8 +212,8 @@ if args.build_macro:
         level_energy_g = [conn.execute(macro_select_energy, (atom, ion, int(cur_level_id))).fetchone() for cur_level_id in level_id_wl['destination_level_id']]
         level_energy_g = np.array(level_energy_g, dtype=[('energy', np.float), ('g', np.float)])
 
-        p_emission_down = 2*nu**2*(level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', (energy - level_energy_g['energy']))
-        p_internal_down = 2*nu**2*(level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', level_energy_g['energy'])
+        p_emission_down = (2*nu**2/constants.cgs.c.value**2)*(level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', (energy - level_energy_g['energy']))
+        p_internal_down = (2*nu**2/constants.cgs.c.value**2)*(level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', level_energy_g['energy'])
 
 
         macro_atom_counts['source_level_number'].append(level_id)
