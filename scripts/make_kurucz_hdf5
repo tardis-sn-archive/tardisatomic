@@ -26,8 +26,6 @@ parser.add_argument('hdf5', help='HDF5 file that is created')
 parser.add_argument('atom_db', help='atom_db')
 parser.add_argument('--loggf_threshold', default=-3., help='log(gf) threshold')
 parser.add_argument('--include_zeta', action='store_true', default=False, help='include recombination coefficients (zeta)')
-atom_group = parser.add_mutually_exclusive_group()
-
 
 parser.add_argument('--build_macro', action='store_true', default=False, help='build macro atom table into the file')
 atom_group = parser.add_mutually_exclusive_group()
@@ -91,7 +89,7 @@ if atom_filter_stmt != '':
     where_stmt.append(atom_filter_stmt)
 
 if where_stmt != []:
-    line_list_sql_stmt += 'where %s' % ' and '.join(where_stmt)
+    line_list_sql_stmt += ' where %s' % ' and '.join(where_stmt)
 
 
 print line_list_sql_stmt
@@ -99,15 +97,14 @@ print line_list_sql_stmt
 line_list_dtype = [('line_id', np.int), ('wavelength', np.float), ('atomic_number', np.int), ('ion_number', np.int), ('f_ul', np.float),
                    ('f_lu', np.float), ('level_number_lower', np.int), ('level_number_upper', np.int)]
 
-line_list_units = ('1', 'angstrom', '1', '1', '1', '1', '1', '1', '1', '1')
+line_list_units = ('1', 'angstrom', '1', '1', '1', '1', '1', '1')
 line_list = conn.execute(line_list_sql_stmt).fetchall()
 line_list = np.array(line_list, dtype=line_list_dtype)
 
 hdf5_file['lines_data'] = line_list
 hdf5_file['lines_data'].attrs['units'] = line_list_units
 
-levels_sql_stmt = 'select atom, ion, level_id, energy, g, metastable ' \
-                  ' from levels'
+levels_sql_stmt = 'select atom, ion, level_id, energy, g, metastable from levels '
 
 where_stmt = []
 
@@ -121,7 +118,7 @@ if where_stmt != []:
 
 
 
-levels_sql_stmt += ' order by glevel_id'
+levels_sql_stmt += ' ORDER BY atom,ion,energy,g'
 
 
 
@@ -129,7 +126,9 @@ print levels_sql_stmt
 
 levels_dtype = [('atomic_number', np.int), ('ion_number', np.int), ('level_number', np.int),
                 ('energy', np.float), ('g', np.int), ('metastable', np.bool)]
-levels_units = ('1', '1', '1', '1', 'eV', '1', '1')
+levels_units = ('1', '1', '1', 'eV', '1', '1')
+print(levels_sql_stmt)
+print(levels_dtype)
 levels_list = conn.execute(levels_sql_stmt).fetchall()
 levels_list = np.array(levels_list, dtype=levels_dtype)
 
