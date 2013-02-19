@@ -1,1 +1,223 @@
-__author__ = 'wkerzend'
+# Importing certain species from the chiantidb into the Kurucz db
+
+import h5py
+import os
+import numpy as np
+from StringIO import StringIO
+from astropy import table, constants, units
+import chianti.core as ch
+import pandas as pd
+import pdb
+from scipy import interpolate
+
+kb_ev = constants.cgs.k_B.to('eV s').value
+
+basic_atom_data = h5py.File(os.path.join(os.path.dirname(__file__), 'data', 'atom_data_basic.h5'))['basic_atom_data']
+symbol2z = dict(zip(basic_atom_data['symbol'], basic_atom_data['atomic_number']))
+
+def read_chianti(symbol, ion_number, level_observed=True, temperatures = np.linspace(2000, 50000, 20)):
+    ion_data = ch.ion('%s_%d' % (symbol.lower(), ion_number))
+    levels_data = {}
+    levels_data['level_number'] = ion_data.Elvlc['lvl']
+
+    temperatures = np.array(temperatures)
+    if level_observed:
+        levels_data['energy'] = units.Unit('cm').to('eV', 1 / np.array(ion_data.Elvlc['ecm']), units.spectral())
+    else:
+        levels_data['energy'] = units.Unit('cm').to('eV', 1 / np.array(ion_data.Elvlc['ecmth']), units.spectral())
+    levels_data['g'] = 2*np.array(ion_data.Elvlc['j']) + 1
+
+    levels_data = pd.DataFrame(levels_data)
+    levels_data.set_index('level_number', inplace=True)
+
+    lines_data = {}
+
+    lines_data['wavelength'] = ion_data.Wgfa['wvl']
+    lines_data['level_number_lower'] = ion_data.Wgfa['lvl1']
+    lines_data['level_number_upper'] = ion_data.Wgfa['lvl2']
+    lines_data['A_ul'] = ion_data.Wgfa['avalue']
+    nu = units.Unit('angstrom').to('Hz', lines_data['wavelength'], units.spectral())
+    lines_data = pd.DataFrame(lines_data)
+
+    g_lower = levels_data['g'].ix[lines_data['level_number_lower'].values].values
+    g_upper = levels_data['g'].ix[lines_data['level_number_upper'].values].values
+
+    A_coeff = (8 * np.pi**2 * constants.cgs.e**2 * nu**2)/ (constants.cgs.m_e * constants.cgs.c**3)
+    lines_data['f_ul'] = lines_data['A_ul'] / A_coeff
+    lines_data['f_lu'] = (lines_data['A_ul'] * g_upper) / (A_coeff * g_lower)
+
+
+    collision_data_index = pd.MultiIndex.from_arrays((ion_data.Splups['lvl1'], ion_data.Splups['lvl2']))
+
+    c_lower_uppers = []
+    conversion_factors = []
+
+
+    for i in xrange(len(ion_data.Splups['lvl1'])):
+        c_lower_upper, conversion_factor = calculate_collisional_strength(ion_data.Splups, i, temperatures, levels_data)
+        c_lower_uppers.append(c_lower_upper)
+        conversion_factors.append(conversion_factor)
+
+    c_lower_uppers = np.array(c_lower_uppers)
+    conversion_factors = np.array(conversion_factors)
+
+    collision_data = pd.DataFrame(c_lower_uppers, index=collision_data_index)
+    collision_data['C_ul_conversion'] = conversion_factors
+
+    collision_data['level_number_lower'] = ion_data.Splups['lvl1']
+    collision_data['level_number_upper'] = ion_data.Splups['lvl2']
+
+
+
+    return levels_data, lines_data, collision_data
+
+def calculate_collisional_strength(splups_data, splups_idx, temperature, level_data):
+    """
+        Function to calculation upsilon from Burgess & Tully 1992 (TType 1 - 4; Eq. 23 - 38)
+    """
+
+    c = splups_data['cups'][splups_idx]
+    x_knots = np.linspace(0, 1, splups_data['nspl'][splups_idx])
+    y_knots = splups_data['splups'][splups_idx]
+
+    level_number_lower = splups_data['lvl1'][splups_idx]
+    level_number_upper = splups_data['lvl2'][splups_idx]
+
+    ttype = splups_data['ttype'][splups_idx]
+    if ttype > 5: ttype -= 5
+
+    kt = kb_ev * temperature
+
+    delta_E = level_data.ix[level_number_upper]['energy'] - level_data.ix[level_number_lower]['energy']
+    g_lower = level_data.ix[level_number_lower]['g']
+    g_upper = level_data.ix[level_number_upper]['g']
+
+    spline_tck = interpolate.splrep(x_knots, y_knots)
+
+    if ttype == 1:
+        x = 1 - np.log(c) / (kt/delta_E + c)
+        y_func = interpolate.splev(x, spline_tck)
+        upsilon = y_func * np.log(kt/delta_E + np.exp(1))
+
+    elif ttype == 2:
+        x = (kt/delta_E) / (kt/delta_E + c)
+        y_func = interpolate.splev(x, spline_tck)
+        upsilon = y_func
+
+    elif ttype == 3:
+        x = (kt/delta_E) / (kt/delta_E + c)
+        y_func = interpolate.splev(x, spline_tck)
+        upsilon = y_func / (kt/delta_E + 1)
+
+    elif ttype == 4:
+        x = 1 - np.log(c) / (kt/delta_E + c)
+        y_func = interpolate.splev(x, spline_tck)
+        upsilon = y_func * np.log(kt/delta_E + c)
+
+    elif ttype == 5:
+        raise ValueError('Not sure what to do with ttype=5')
+
+    #### REFERENCE MISSING #####
+    c_lower_upper = 8.63e-6 * upsilon * np.exp(-delta_E/kt) / (g_lower * temperature**.5)
+    conversion_factor = g_upper / float(g_lower)
+
+    return c_lower_upper, conversion_factor
+
+
+def insert_to_db(symbol, ion_number, conn, temperatures=None):
+    atomic_number = int(symbol2z[symbol])
+
+
+
+    curs = conn.cursor()
+
+
+    curs.execute('delete from levels where atom=? and ion=?', (atomic_number, ion_number - 1))
+    curs.execute('delete from lines where atom=? and ion=?', (atomic_number, ion_number - 1))
+
+
+    collision_data_cols = curs.execute('pragma table_info(collision_data)').fetchall()
+
+
+    if temperatures is None:
+        print "Trying to infer temperatures from column names"
+
+    if collision_data_cols == []:
+        raise IOError('The given database doesn\'t contain a collision_data table - please create it')
+
+    else:
+        temperatures_data = [int(item.strip('t')) for item in zip(*collision_data_cols)[1] if item.startswith('t')]
+        print "Inferred temperatures are %s" % (temperatures_data,)
+
+    levels_data, lines_data, collision_data = read_chianti(symbol, ion_number, temperatures=temperatures_data)
+
+    for key, line in lines_data.iterrows():
+        curs.execute('insert into lines(wl, atom, ion, level_id_upper, level_id_lower, f_lu, f_ul) '
+                     'values(?, ?, ?, ?, ?, ?, ?)',
+                     (line['wavelength'], atomic_number, ion_number-1,
+                      line['level_number_upper']-1, line['level_number_lower']-1,
+                      line['f_lu'], line['f_ul']))
+
+
+    for key, level in levels_data.iterrows():
+        count_down = curs.execute('select count(id) from lines where atom=? and ion=? and level_id_upper=?',
+                     (atomic_number, ion_number, int(key-1))).fetchone()[0]
+
+        curs.execute('insert into levels(atom, ion, energy, g, level_id, metastable) values(?, ?, ?, ?, ?, ?)',
+                     (atomic_number, ion_number-1, level['energy'], level['g'], int(key-1), count_down == 0))
+
+
+
+    insert_stmt = 'insert into collision_data(atom, ion, level_number_lower, level_number_upper, %s, c_ul_conversion) values(%s)'
+
+    insert_stmt = insert_stmt % (', '.join(['t%06d' % item for item in temperatures_data]), ','.join('?' * (len(temperatures_data ) + 5)))
+
+    for (level_number_lower, level_number_upper), collision_data in collision_data.iterrows():
+        c_lu =  list(collision_data[:len(temperatures_data)].values)
+        C_ul_conversion = collision_data[-3]
+        level_number_lower = collision_data[-2] - 1
+        level_number_upper = collision_data[-1] - 1
+
+        collision_line_data = [atomic_number, ion_number-1, level_number_lower, level_number_upper] + c_lu + [C_ul_conversion]
+
+
+        curs.execute(insert_stmt, collision_line_data)
+
+
+
+
+
+
+
+
+def create_collision_data_table(conn, temperatures=np.arange(2000, 50000, 2000)):
+
+    curs = conn.cursor()
+
+
+    collision_data_table_stmt = """create table collision_data(id integer primary key,
+                                                atom integer,
+                                                ion integer,
+                                                level_number_upper integer,
+                                                level_number_lower integer,
+                                                c_ul_conversion float,
+                                                %s)
+                                                """
+    temperatures = temperatures.astype(np.int64)
+    temperature_fields = ',\n'.join(['t%06d float' % temperature for temperature in temperatures])
+
+    collision_data_table_stmt = collision_data_table_stmt % temperature_fields
+
+
+    curs.execute('drop table if exists collision_data')
+    curs.execute(collision_data_table_stmt)
+
+    print "Created table collision_data"
+
+
+
+
+
+
+
+
