@@ -5,6 +5,8 @@
 import argparse
 import h5py
 import os
+import sys
+import pandas as pd
 
 from astropy import units, constants, table
 
@@ -32,6 +34,8 @@ parser.add_argument('--loggf_threshold', default=-3., help='log(gf) threshold')
 parser.add_argument('--include_zeta', action='store_true', default=False, help='include recombination coefficients (zeta)')
 parser.add_argument('--include_collision', action='store_true', default=False, help='include collision rates')
 parser.add_argument('--build_macro', action='store_true', default=False, help='build macro atom table into the file')
+parser.add_argument('--synpp_refs', help='point to the synpp_refs.dat')
+
 atom_group = parser.add_mutually_exclusive_group()
 
 
@@ -75,11 +79,24 @@ else:
 basic_atom_data_fname = os.path.join(os.path.dirname(sql_stmts.__file__), 'data', 'atom_data_basic.h5')
 zeta_datafile = os.path.join(os.path.dirname(sql_stmts.__file__), 'data', 'knox_long_recombination_zeta.dat')
 
+if os.path.exists(args.hdf5):
+    print "HDF5 File exists - this procedure will overwrite it"
+    if raw_input('Okay? [Y/n]').lower().startswith('n'):
+        sys.exit(0)
 
 os.system('cp %s %s' % (basic_atom_data_fname, args.hdf5))
 hdf5_file = h5py.File(args.hdf5)
 
+
+if not os.path.exists(args.atom_db):
+    raise ValueError('Database %s does not exist' % args.atom_db)
+
 conn = sqlite3.connect(args.atom_db)
+
+try:
+    conn.execute('create index lines_h5_index on lines(atom, ion, level_id_lower, level_id_upper)')
+except sqlite3.OperationalError as e:
+    print e
 
 line_list_sql_stmt = ('select id, wl, atom, ion, f_ul, f_lu, level_id_lower, level_id_upper from lines')
 #line_list_sql_stmt += 'where  loggf > %s ' % args.loggf_threshold
@@ -198,7 +215,7 @@ if args.build_macro:
     macro_atom_counts['count_total'] = []
 
     last_atom = -1
-    for atom, ion, level_id, energy, g in conn.execute('select atom, ion, level_id, energy, g from levels'):
+    for atom, ion, level_id, energy, g in conn.execute('select atom, ion, level_id, energy, g from levels order by atom, ion, level_id'):
         if last_atom != atom:
             print "new atom %d" % atom
 
@@ -219,8 +236,8 @@ if args.build_macro:
         level_energy_g = [conn.execute(macro_select_energy, (atom, ion, int(cur_level_id))).fetchone() for cur_level_id in level_id_wl['destination_level_id']]
         level_energy_g = np.array(level_energy_g, dtype=[('energy', np.float), ('g', np.float)])
 
-        p_emission_down = (2*nu**2/constants.cgs.c.value**2)*(level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', (energy - level_energy_g['energy']))
-        p_internal_down = (2*nu**2/constants.cgs.c.value**2)*(level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', level_energy_g['energy'])
+        p_emission_down = (2*nu**2/constants.c.cgs.value**2)*(level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', (energy - level_energy_g['energy']))
+        p_internal_down = (2*nu**2/constants.c.cgs.value**2)*(level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', level_energy_g['energy'])
 
 
         macro_atom_counts['source_level_number'].append(level_id)
@@ -251,7 +268,7 @@ if args.build_macro:
         level_energy_g = [conn.execute(macro_select_energy, (atom, ion, int(cur_level_id))).fetchone() for cur_level_id in level_id_wl['destination_level_id']]
         level_energy_g = np.array(level_energy_g, dtype=[('energy', np.float), ('g', np.float)])
 
-        p_internal_up = 1/(constants.cgs.h.value*nu) * level_id_wl['f_lu']
+        p_internal_up = 1/(constants.h.cgs.value*nu) * level_id_wl['f_lu']
         macro_atom_counts['count_up'].append(len(nu))
         macro_atom['atomic_number'] += [atom]*len(nu)
         macro_atom['ion_number'] += [ion]*len(nu)
@@ -296,11 +313,34 @@ if args.include_collision:
     hdf5_file['collision_data'].attrs['temperatures'] = temperatures
 
 
+if args.synpp_refs is not None:
+    synpp_refs_data = np.genfromtxt(args.synpp_refs, usecols=(0,1), dtype=[int, float])
+    synpp_atom = np.floor(synpp_refs_data['f0']/100.).astype(int)
+    synpp_ion = (synpp_refs_data['f0'] - synpp_atom*100)
+    synpp_line = synpp_refs_data['f1']
+
+    synpp_line_ids = []
+    for atom, ion, wl in zip(synpp_atom, synpp_ion, synpp_line):
+        current_line_list = line_list[(line_list['atomic_number']==atom) & (line_list['ion_number'] == ion)]
+        if current_line_list == []:
+            raise ValueError('Fix incomplete linelist later')
+        synpp_line_ids.append(current_line_list['line_id'][np.argmin(np.abs(current_line_list['wavelength'] - wl))])
+
+    synpp_ref = np.array(zip(synpp_atom, synpp_ion, synpp_line, synpp_line_ids),
+                         dtype=[('atomic_number', np.int64), ('ion_number', np.int64), ('wavelength', np.float64), ('line_id', np.int64)])
+
+    hdf5_file['synpp_refs'] = synpp_ref
+
+
+
+
+
 print "Signing Atom_data with MD5 and UUID1"
 
 md5_hash = hashlib.md5()
 for dataset in hdf5_file.values():
     md5_hash.update(dataset.value.data)
+
 
 
 

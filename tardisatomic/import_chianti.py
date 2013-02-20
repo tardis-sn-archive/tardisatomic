@@ -10,7 +10,7 @@ import pandas as pd
 import pdb
 from scipy import interpolate
 
-kb_ev = constants.cgs.k_B.to('eV s').value
+kb_ev = constants.k_B.cgs.to('eV / K').value
 
 basic_atom_data = h5py.File(os.path.join(os.path.dirname(__file__), 'data', 'atom_data_basic.h5'))['basic_atom_data']
 symbol2z = dict(zip(basic_atom_data['symbol'], basic_atom_data['atomic_number']))
@@ -42,10 +42,12 @@ def read_chianti(symbol, ion_number, level_observed=True, temperatures = np.lins
     g_lower = levels_data['g'].ix[lines_data['level_number_lower'].values].values
     g_upper = levels_data['g'].ix[lines_data['level_number_upper'].values].values
 
-    A_coeff = (8 * np.pi**2 * constants.cgs.e**2 * nu**2)/ (constants.cgs.m_e * constants.cgs.c**3)
+    A_coeff = (8 * np.pi**2 * constants.e.gauss.value**2 * nu**2)/ (constants.m_e.cgs.value * constants.c.cgs.value**3)
     lines_data['f_ul'] = lines_data['A_ul'] / A_coeff
     lines_data['f_lu'] = (lines_data['A_ul'] * g_upper) / (A_coeff * g_lower)
-
+    lines_data['loggf'] = np.log10(lines_data['f_lu'] * g_lower)
+    lines_data['wavelength'] = lines_data['wavelength'] / (1.0 + 2.735182E-4 + 131.4182 / lines_data['wavelength']**2
+                                                           + 2.76249E8 / lines_data['wavelength']**4)
 
     collision_data_index = pd.MultiIndex.from_arrays((ion_data.Splups['lvl1'], ion_data.Splups['lvl2']))
 
@@ -152,11 +154,11 @@ def insert_to_db(symbol, ion_number, conn, temperatures=None):
     levels_data, lines_data, collision_data = read_chianti(symbol, ion_number, temperatures=temperatures_data)
 
     for key, line in lines_data.iterrows():
-        curs.execute('insert into lines(wl, atom, ion, level_id_upper, level_id_lower, f_lu, f_ul) '
-                     'values(?, ?, ?, ?, ?, ?, ?)',
+        curs.execute('insert into lines(wl, atom, ion, level_id_upper, level_id_lower, f_lu, f_ul, loggf) '
+                     'values(?, ?, ?, ?, ?, ?, ?, ?)',
                      (line['wavelength'], atomic_number, ion_number-1,
                       line['level_number_upper']-1, line['level_number_lower']-1,
-                      line['f_lu'], line['f_ul']))
+                      line['f_lu'], line['f_ul'], line['loggf']))
 
 
     for key, level in levels_data.iterrows():
@@ -165,6 +167,7 @@ def insert_to_db(symbol, ion_number, conn, temperatures=None):
 
         curs.execute('insert into levels(atom, ion, energy, g, level_id, metastable) values(?, ?, ?, ?, ?, ?)',
                      (atomic_number, ion_number-1, level['energy'], level['g'], int(key-1), count_down == 0))
+
 
 
 
@@ -182,6 +185,9 @@ def insert_to_db(symbol, ion_number, conn, temperatures=None):
 
 
         curs.execute(insert_stmt, collision_line_data)
+
+    conn.commit()
+
 
 
 
