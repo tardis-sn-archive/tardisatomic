@@ -124,7 +124,7 @@ line_list_units = ('1', 'angstrom', '1', '1', '1', '1', '1', '1')
 line_list = conn.execute(line_list_sql_stmt).fetchall()
 line_list = np.array(line_list, dtype=line_list_dtype)
 
-line_list['line_id'] = np.arange(len(line_list))
+
 hdf5_file['lines_data'] = line_list
 hdf5_file['lines_data'].attrs['units'] = line_list_units
 
