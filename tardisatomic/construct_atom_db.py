@@ -156,17 +156,23 @@ FROM
     """
 
 def add_fully_ionized_levels(conn):
-    add_full_ionized_levels ="""
+    #Clean first
+    clean_fully_ionized_stmt = "DELETE FROM levels WHERE atom == ion "
+    conn.execute(clean_fully_ionized_stmt)
+
+    add_full_ionized_levels_stmt ="""
 INSERT INTO
     levels (atom,ion,energy,g,metastable,level_id)
     SELECT DISTINCT
-        atom,atom,0,1,1,(100*(atom*100+atom))
+        atom,atom,0,1,1,0)
     FROM
         levels
     WHERE NOT EXISTS
-        (SELECT * FROM levels WHERE atom == ion)
+        (SELECT 1 FROM levels WHERE atom == ion)
+        AND EXISTS
+        (SELECT 1 FROM levels WHERE ion == atom - 1)
 """
-    conn.execute(add_full_ionized_levels)
+    conn.execute(add_full_ionized_levels_stmt)
     conn.commit()
 
 

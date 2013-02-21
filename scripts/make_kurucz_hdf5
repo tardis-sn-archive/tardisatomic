@@ -233,11 +233,11 @@ if args.build_macro:
         level_id_wl = np.array(level_id_wl, dtype=level_id_dtype)
         nu = units.Unit('Angstrom').to('Hz', level_id_wl['wavelength'], units.spectral())
 
-        level_energy_g = [conn.execute(macro_select_energy, (atom, ion, int(cur_level_id))).fetchone() for cur_level_id in level_id_wl['destination_level_id']]
-        level_energy_g = np.array(level_energy_g, dtype=[('energy', np.float), ('g', np.float)])
+        destination_level_energy_g = [conn.execute(macro_select_energy, (atom, ion, int(cur_level_id))).fetchone() for cur_level_id in level_id_wl['destination_level_id']]
+        destination_level_energy_g = np.array(destination_level_energy_g, dtype=[('energy', np.float), ('g', np.float)])
 
-        p_emission_down = (2*nu**2/constants.c.cgs.value**2)*(level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', (energy - level_energy_g['energy']))
-        p_internal_down = (2*nu**2/constants.c.cgs.value**2)*(level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', level_energy_g['energy'])
+        p_emission_down = (2*nu**2/constants.c.cgs.value**2)*(destination_level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', (energy - destination_level_energy_g['energy']))
+        p_internal_down = (2*nu**2/constants.c.cgs.value**2)*(destination_level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', destination_level_energy_g['energy'])
 
 
         macro_atom_counts['source_level_number'].append(level_id)
@@ -265,10 +265,12 @@ if args.build_macro:
         level_id_wl = np.array(level_id_wl, dtype=level_id_dtype)
         nu = units.Unit('Angstrom').to('Hz', level_id_wl['wavelength'], units.spectral())
 
-        level_energy_g = [conn.execute(macro_select_energy, (atom, ion, int(cur_level_id))).fetchone() for cur_level_id in level_id_wl['destination_level_id']]
-        level_energy_g = np.array(level_energy_g, dtype=[('energy', np.float), ('g', np.float)])
+        destination_level_energy_g = [conn.execute(macro_select_energy, (atom, ion, int(cur_level_id))).fetchone() for cur_level_id in level_id_wl['destination_level_id']]
+        destination_level_energy_g = np.array(destination_level_energy_g, dtype=[('energy', np.float), ('g', np.float)])
 
-        p_internal_up = 1/(constants.h.cgs.value*nu) * level_id_wl['f_lu']
+        p_internal_up = 1/(constants.h.cgs.value*nu) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', energy)
+
+
         macro_atom_counts['count_up'].append(len(nu))
         macro_atom['atomic_number'] += [atom]*len(nu)
         macro_atom['ion_number'] += [ion]*len(nu)
