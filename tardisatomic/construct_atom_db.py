@@ -164,7 +164,7 @@ def add_fully_ionized_levels(conn):
 INSERT INTO
     levels (atom,ion,energy,g,metastable,level_id)
     SELECT DISTINCT
-        atom,atom,0,1,1,0)
+        atom,atom,0,1,1,0
     FROM
         levels
     WHERE NOT EXISTS
