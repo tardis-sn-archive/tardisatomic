@@ -175,7 +175,7 @@ def insert_to_db(symbol, ion_number, conn, temperatures=None):
 
     for key, level in levels_data.iterrows():
         count_down = curs.execute('select count(id) from lines where atom=? and ion=? and level_id_upper=?',
-                     (atomic_number, ion_number, int(key-1))).fetchone()[0]
+                     (atomic_number, ion_number-1, int(key-1))).fetchone()[0]
 
         curs.execute('insert into levels(atom, ion, energy, g, level_id, metastable) values(?, ?, ?, ?, ?, ?)',
                      (atomic_number, ion_number-1, level['energy'], level['g'], int(key-1), count_down == 0))
