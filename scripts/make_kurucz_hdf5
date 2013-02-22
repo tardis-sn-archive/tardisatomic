@@ -262,7 +262,8 @@ if args.build_macro:
         macro_atom['transition_line_id'] += list(level_id_wl['line_id'])*2
 
 
-        macro_select_levels_fmt = macro_select_levels.format(source_relation='lower', destination_relation='upper')
+        macro_select_levels_fmt = macro_select_levels.format(source_relation='lower', destination_relation='upper',
+                                                             loggf_thresh=args.loggf_threshold)
 
         level_id_wl = conn.execute(macro_select_levels_fmt, (level_id, atom, ion, level_id)).fetchall()
         level_id_wl = np.array(level_id_wl, dtype=level_id_dtype)
