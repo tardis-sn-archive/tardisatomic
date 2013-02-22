@@ -30,6 +30,10 @@ def read_chianti(symbol, ion_number, level_observed=True, temperatures = np.lins
     levels_data = pd.DataFrame(levels_data)
     levels_data.set_index('level_number', inplace=True)
 
+    last_bound_level = levels_data[levels_data['energy'] < ion_data.Ip].index[-1]
+
+    levels_data = levels_data.ix[:last_bound_level]
+
     lines_data = {}
 
     lines_data['wavelength'] = ion_data.Wgfa['wvl']
@@ -49,13 +53,21 @@ def read_chianti(symbol, ion_number, level_observed=True, temperatures = np.lins
     lines_data['wavelength'] = lines_data['wavelength'] / (1.0 + 2.735182E-4 + 131.4182 / lines_data['wavelength']**2
                                                            + 2.76249E8 / lines_data['wavelength']**4)
 
+    lines_data = lines_data[lines_data['level_number_upper'] <= last_bound_level]
     collision_data_index = pd.MultiIndex.from_arrays((ion_data.Splups['lvl1'], ion_data.Splups['lvl2']))
 
+    c_lvl1 = []
+    c_lvl2 = []
     c_lower_uppers = []
     conversion_factors = []
 
 
-    for i in xrange(len(ion_data.Splups['lvl1'])):
+    for i, (lvl1, lvl2) in enumerate(zip(ion_data.Splups['lvl1'], ion_data.Splups['lvl2'])):
+        if lvl2 > last_bound_level:
+            continue
+
+        c_lvl1.append(lvl1)
+        c_lvl2.append(lvl2)
         c_lower_upper, conversion_factor = calculate_collisional_strength(ion_data.Splups, i, temperatures, levels_data)
         c_lower_uppers.append(c_lower_upper)
         conversion_factors.append(conversion_factor)
@@ -66,8 +78,8 @@ def read_chianti(symbol, ion_number, level_observed=True, temperatures = np.lins
     collision_data = pd.DataFrame(c_lower_uppers, index=collision_data_index)
     collision_data['C_ul_conversion'] = conversion_factors
 
-    collision_data['level_number_lower'] = ion_data.Splups['lvl1']
-    collision_data['level_number_upper'] = ion_data.Splups['lvl2']
+    collision_data['level_number_lower'] = c_lvl1
+    collision_data['level_number_upper'] = c_lvl2
 
 
 

@@ -169,9 +169,9 @@ INSERT INTO
         levels
     WHERE NOT EXISTS
         (SELECT 1 FROM levels WHERE atom == ion)
-        AND EXISTS
-        (SELECT 1 FROM levels WHERE ion == atom - 1)
-"""
+    AND
+        atom in (1, 2)
+    """
     conn.execute(add_full_ionized_levels_stmt)
     conn.commit()
 

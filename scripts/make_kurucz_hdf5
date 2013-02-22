@@ -182,7 +182,9 @@ if args.build_macro:
                                 lines
 
                             where
-                             atom=? and ion=? and level_id_{source_relation}=?"""
+                             atom=? and ion=? and level_id_{source_relation}=?
+                            and
+                                loggf > {loggf_thresh}"""
 
     macro_select_energy = """select
                                 energy, g
@@ -228,7 +230,8 @@ if args.build_macro:
 
 
 
-        macro_select_levels_fmt = macro_select_levels.format(source_relation='upper', destination_relation='lower')
+        macro_select_levels_fmt = macro_select_levels.format(source_relation='upper', destination_relation='lower',
+                                                             loggf_thresh=args.loggf_threshold)
         level_id_wl = conn.execute(macro_select_levels_fmt, (level_id, atom, ion, level_id)).fetchall()
         level_id_wl = np.array(level_id_wl, dtype=level_id_dtype)
         nu = units.Unit('Angstrom').to('Hz', level_id_wl['wavelength'], units.spectral())
