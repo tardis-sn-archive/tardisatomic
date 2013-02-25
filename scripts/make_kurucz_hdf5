@@ -35,6 +35,7 @@ parser.add_argument('--include_zeta', action='store_true', default=False, help='
 parser.add_argument('--include_collision', action='store_true', default=False, help='include collision rates')
 parser.add_argument('--build_macro', action='store_true', default=False, help='build macro atom table into the file')
 parser.add_argument('--synpp_refs', help='point to the synpp_refs.dat')
+parser.add_argument('--include_ion_cx', action='store_true', default=False, help='include ionization cross sections (ion_cx)')
 
 atom_group = parser.add_mutually_exclusive_group()
 
@@ -338,15 +339,20 @@ if args.synpp_refs is not None:
 
     hdf5_file['synpp_refs'] = synpp_ref
 
-
-
-
+if args.include_ion_cx:
+    select_ion_cx_th = 'SELECT levels.atom, levels.ion, levels.energy, ion_cx.cx_threshold FROM levels, ion_cx WHERE levels.id = ion_cx.levels_id '
+    select_ion_cx_sp = 'SELECT levels.atom, levels.ion, levels.energy, ion_cx.cx_threshold, ion_cx_supporter.nu, ion_cx_supporter.xs FROM levels, ion_cx, ion_cx_supporter WHERE levels.id = ion_cx.levels_id AND ion_cx_supporter.ion_cx_id = ion_cx.levels_id'
+    ion_cx_th_data = conn.execute(select_ion_cx_th).fetchall()
+    ion_cx_sp_data = conn.execute(select_ion_cx_sp).fetchall()
+    hdf5_file['ionization_cx_threshold'] = ion_cx_th_data
+    hdf5_file['ionization_cx_support'] = ion_sp_th_data
 
 print "Signing Atom_data with MD5 and UUID1"
 
 md5_hash = hashlib.md5()
 for dataset in hdf5_file.values():
     md5_hash.update(dataset.value.data)
+
 
 
 

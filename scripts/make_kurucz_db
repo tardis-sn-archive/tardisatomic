@@ -6,6 +6,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('dbname')
 parser.add_argument('--gfall',help='Specify which gfall database the script should use. If nothing is given the script tries to take the default "__file__/data/gfall.db".',type=str,default=None)
+parser.add_argument('--photo-xs',help='Computes the photoionization cross section')
 
 args = parser.parse_args()
 
