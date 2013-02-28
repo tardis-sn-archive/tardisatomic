@@ -475,22 +475,25 @@ def read_zeta(conn):
 def ion_xs(conn):
     print("Creating the ionization cross section table.")
     ion_xs_create_table = """
-    CREATE TABLE ion_cx(id INTEGER PRIMARY KEY, levels_id INTEGER, cx_threshold FLOAT, FOREIGN KEY(levels_id) REFERENCES levels(id))
+    CREATE TABLE ion_cx(id INTEGER PRIMARY KEY, level_id INTEGER, atom INTEGER, ion INTEGER, cx_threshold FLOAT, FOREIGN KEY(level_id, atom, ion) REFERENCES levels(level_id, atom, ion))
     """
     ion_xs_creat_supporter = """
-    CREATE TABLE ion_cx_supporter(id INTEGER PRIMARY KEY, ion_cx_id INTEGER , nu FLOAT , xs FLOAT FOREIGN KEY(ion_cx_id) REFERENCES ion_cx(id))
+    CREATE TABLE ion_cx_supporter(id INTEGER PRIMARY KEY, ion_cx_id INTEGER , nu FLOAT , xs FLOAT, FOREIGN KEY(ion_cx_id) REFERENCES ion_cx(id))
     """
 
 
     curs = conn.cursor()
+    #curs.execute('PRAGMA foreign_keys = ON')
     curs.execute(ion_xs_create_table)
     curs.execute(ion_xs_creat_supporter)
-    atomdata = np.array(curs.execute('SELECT id,atom,ion FROM levels').fetchall())
 
-    cx = analytic_cross_section(atomdata[:,1],atomdata[:,1] - atomdata[:,2],0.8)
+
+    atomdata = np.array(curs.execute('SELECT level_id,atom,ion FROM levels').fetchall())
+
+    cx = import_ionDB.analytic_cross_section(atomdata[:,1],atomdata[:,1] - atomdata[:,2],0.8)
     final = np.concatenate((atomdata,cx[:,None]),axis=1)
     for i in final:
-        curs.execute('INSERT OR IGNORE INTO ion_cx (levels_id, xs) VALUES (?,?,?)',(int(i[0]),i[3]))
+        curs.execute('INSERT OR IGNORE INTO ion_cx (level_id, atom, ion, cx_threshold) VALUES (?,?,?,?)',(int(i[0]),int(i[1]),int(i[2]),i[3]))
     conn.commit()
     return conn
 

@@ -340,17 +340,18 @@ if args.synpp_refs is not None:
     hdf5_file['synpp_refs'] = synpp_ref
 
 if args.include_ion_cx:
-    select_ion_cx_th = 'SELECT levels.atom, levels.ion, levels.energy, ion_cx.cx_threshold FROM levels, ion_cx WHERE levels.id = ion_cx.levels_id '
-    select_ion_cx_sp = 'SELECT levels.atom, levels.ion, levels.energy, ion_cx.cx_threshold, ion_cx_supporter.nu, ion_cx_supporter.xs FROM levels, ion_cx, ion_cx_supporter WHERE levels.id = ion_cx.levels_id AND ion_cx_supporter.ion_cx_id = ion_cx.levels_id'
+    select_ion_cx_th = 'SELECT levels.atom, levels.ion, levels.level_id, ion_cx.cx_threshold FROM levels, ion_cx WHERE levels.level_id = ion_cx.level_id AND ion_cx.atom = levels.atom AND ion_cx.ion = levels.ion'
+    select_ion_cx_sp = 'SELECT levels.atom, levels.ion, levels.level_id,  levels.energy, ion_cx.cx_threshold, ion_cx_supporter.nu, ion_cx_supporter.xs  FROM ion_cx_supporter INNER JOIN ion_cx ON ion_cx_supporter.ion_cx_id = ion_cx.id INNER JOIN levels ON ion_cx.level_id = levels.level_id AND ion_cx.atom = levels.atom AND ion_cx.ion = levels.ion'
     ion_cx_th_data = conn.execute(select_ion_cx_th).fetchall()
     ion_cx_sp_data = conn.execute(select_ion_cx_sp).fetchall()
     hdf5_file['ionization_cx_threshold'] = ion_cx_th_data
-    hdf5_file['ionization_cx_support'] = ion_sp_th_data
+    hdf5_file['ionization_cx_support'] = ion_cx_sp_data
 
 print "Signing Atom_data with MD5 and UUID1"
 
 md5_hash = hashlib.md5()
 for dataset in hdf5_file.values():
+    print(dataset)
     md5_hash.update(dataset.value.data)
 
 

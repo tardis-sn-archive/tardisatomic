@@ -6,7 +6,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('dbname')
 parser.add_argument('--gfall',help='Specify which gfall database the script should use. If nothing is given the script tries to take the default "__file__/data/gfall.db".',type=str,default=None)
-parser.add_argument('--photo-xs',help='Computes the photoionization cross section')
+#parser.add_argument('--photo-xs',help='Computes the photoionization cross section')
 
 args = parser.parse_args()
 
@@ -21,5 +21,6 @@ conn = construct_atom_db.link_levels(conn)
 conn = construct_atom_db.create_temporary_transition_table(conn)
 conn = construct_atom_db.create_macro_atom(conn)
 conn = construct_atom_db.flag_metastable(conn)
+conn = construct_atom_db.ion_xs(conn)
 conn = construct_atom_db.read_zeta(conn)
 conn.close()
