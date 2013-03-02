@@ -1,0 +1,44 @@
+#this is not really a script as it does not have input
+
+
+import h5py
+import numpy as np
+import re
+import os
+from astropy import units
+from tardisatomic import sql_stmts
+
+
+tardisatomic_data = os.path.join(os.path.dirname(sql_stmts.__file__), 'data')
+
+default_basic_atom_data = os.path.join(tardisatomic_data, 'basic_atom_data.dat')
+default_ionization_data = os.path.join(tardisatomic_data, 'chianti_ionization.dat')
+
+
+
+uncertainty_pattern = re.compile('(.+?)\(\d\)')
+
+def convert_atomic_weights_str(atomic_weight_str):
+
+    uncertainty_match = uncertainty_pattern.match(atomic_weight_str)
+
+    if uncertainty_match is not None:
+        atomic_weight_str = uncertainty_match.groups()[0]
+
+    return float(atomic_weight_str.strip('[]'))
+
+basic_atomic_data = np.recfromtxt(default_basic_atom_data, names=['atomic_number', 'symbol', 'name', 'mass'], converters={3:convert_atomic_weights_str})
+
+ionization_data = np.recfromtxt(default_ionization_data, names=['atomic_number', 'ion_number', 'ionization_energy'], comments='%')
+
+ionization_data['ionization_energy'] **= -1
+
+ionization_data['ionization_energy'] = units.Unit('cm').to('eV', ionization_data['ionization_energy'], units.spectral())
+
+os.system('rm atom_data_basic.h5')
+
+hdf5_file = h5py.File('atom_data_basic.h5')
+hdf5_file['basic_atom_data'] = basic_atomic_data
+hdf5_file['ionization_data'] = ionization_data
+
+hdf5_file.close()

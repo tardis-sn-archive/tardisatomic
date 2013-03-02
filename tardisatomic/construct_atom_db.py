@@ -33,10 +33,6 @@ SELECT
     label_lower
 FROM
     kurucz_lines.gfall
-
-WHERE
-    loggf > %(loggf_thresh).2f
-    %(where_stmt)s
 """
 
 linelist_insert_stmt = """
@@ -84,7 +80,7 @@ SET
 """
     
     
-def new_linelist_from_gfall(new_dbname, gfall_fname=None, loggf_threshold=-5, select_atom=None):
+def new_linelist_from_gfall(new_dbname, gfall_fname=None, select_atom=None):
     print "Reading lines from Kurucz gfall"
     conn = sqlite3.connect(new_dbname)
     conn.create_function('pow', 2, math.pow)
@@ -99,7 +95,7 @@ def new_linelist_from_gfall(new_dbname, gfall_fname=None, loggf_threshold=-5, se
         elem_select_stmt = ""
     else:
         elem_select_stmt = " and elem in (%s)" % (','.join(map(str, select_atom)),)
-    insert_fromgfall_stmt = linelist_insert_stmt + linelist_select_stmt % {'hc':hc, 'loggf_thresh':loggf_threshold, 'where_stmt':elem_select_stmt} 
+    insert_fromgfall_stmt = linelist_insert_stmt + linelist_select_stmt % {'hc':hc, 'where_stmt':elem_select_stmt}
     
     if sqlparse_available:
         print sqlparse.format(insert_fromgfall_stmt, reindent=True)
