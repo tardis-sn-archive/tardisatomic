@@ -34,6 +34,8 @@ parser.add_argument('--loggf_threshold', default=-3., help='log(gf) threshold')
 parser.add_argument('--include_zeta', action='store_true', default=False, help='include recombination coefficients (zeta)')
 parser.add_argument('--include_collision', action='store_true', default=False, help='include collision rates')
 parser.add_argument('--build_macro', action='store_true', default=False, help='build macro atom table into the file')
+parser.add_argument('--max_atomic_number', default=30, help=('Setting the maximum atomic number to be stored in the HDF5'
+            'file. For now 30 is the limit as I don\'t have reliable ionization data for anything above.'))
 parser.add_argument('--synpp_refs', help='point to the synpp_refs.dat')
 
 atom_group = parser.add_mutually_exclusive_group()
@@ -90,6 +92,9 @@ hdf5_file = h5py.File(args.hdf5)
 ######################################################
 
 
+ionization_data = pd.DataFrame(hdf5_file['ionization_data'].__array__())
+ionization_data.set_index(['atomic_number', 'ion_number'], inplace=True)
+
 if not os.path.exists(args.atom_db):
     raise ValueError('Database %s does not exist' % args.atom_db)
 
@@ -105,6 +110,7 @@ lines_data_sql_stmt = ('select id, wl, atom, ion, f_ul, f_lu, level_id_lower, le
 
 
 where_stmt = ['loggf > %s' % args.loggf_threshold]
+where_stmt += ['atom <= %d' % args.max_atomic_number]
 
 if ion_filter_stmt != '':
     where_stmt.append(ion_filter_stmt)
@@ -143,13 +149,13 @@ lines_data_level_number_upper = lines_data_level_number_upper.groupby(level=['at
 lines_data_level_number_lower = lines_data.set_index(['atomic_number', 'ion_number', 'level_number_lower'])
 lines_data_level_number_lower = lines_data_level_number_lower.groupby(level=['atomic_number', 'ion_number', 'level_number_lower'])
 
-lines_data = lines_data.set_index('line_id')
+#lines_data = lines_data.set_index('line_id')
 
 
 
 levels_sql_stmt = 'select atom, ion, level_id, energy, g from levels '
 
-where_stmt = []
+where_stmt = ['atom <= %d' % args.max_atomic_number]
 
 if ion_filter_stmt != '':
     where_stmt.append(ion_filter_stmt)
@@ -182,7 +188,53 @@ count_down = lines_data_level_number_upper['line_id'].count()
 levels_data['metastable'] = count_down == 0
 levels_data['metastable'] = pd.isnull(levels_data['metastable'])
 
-1/0
+
+levels_atom_ion_index = zip(levels_data.index.get_level_values('atomic_number'),
+                            levels_data.index.get_level_values('ion_number').values + 1)
+
+levels_ionization_energy = ionization_data.ix[levels_atom_ion_index]
+levels_ionization_energy = levels_ionization_energy.values.reshape(levels_ionization_energy.shape[0])
+
+auto_ionizing_levels_mask = (levels_data.energy >= levels_ionization_energy).values
+
+auto_ionizing_levels = levels_data[auto_ionizing_levels_mask]
+
+auto_ionizing_line_ids = []
+
+for index in auto_ionizing_levels.index:
+    index_in_lines = False
+    try:
+        line_group = lines_data_level_number_upper.get_group(index)
+    except KeyError:
+        pass
+    else:
+        auto_ionizing_line_ids += line_group.line_id.values.tolist()
+        index_in_lines = True
+
+    try:
+        line_group = lines_data_level_number_lower.get_group(index)
+    except KeyError:
+        pass
+    else:
+        auto_ionizing_line_ids += line_group.line_id.values.tolist()
+        index_in_lines = True
+
+    if not index_in_lines:
+        print "INDEX %s not in lines" % (index,)
+
+
+auto_ionizing_line_ids = np.unique(auto_ionizing_line_ids)
+lines_data = lines_data[~lines_data.reset_index().line_id.isin(auto_ionizing_line_ids).values]
+levels_data = levels_data[~auto_ionizing_levels_mask]
+
+lines_data_level_number_upper = lines_data.set_index(['atomic_number', 'ion_number', 'level_number_upper'])
+lines_data_level_number_upper = lines_data_level_number_upper.groupby(level=['atomic_number', 'ion_number', 'level_number_upper'])
+
+lines_data_level_number_lower = lines_data.set_index(['atomic_number', 'ion_number', 'level_number_lower'])
+lines_data_level_number_lower = lines_data_level_number_lower.groupby(level=['atomic_number', 'ion_number', 'level_number_lower'])
+
+lines_data = lines_data.set_index('line_id')
+
 
 hdf5_file['lines_data'] = lines_data.reset_index().to_records(index=False)
 hdf5_file['levels_data'] = levels_data.reset_index().to_records(index=False)
