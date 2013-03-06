@@ -153,6 +153,7 @@ FROM
 
 def add_fully_ionized_levels(conn):
     #Clean first
+    print "Adding fully ionized levels for H and He"
     clean_fully_ionized_stmt = "DELETE FROM levels WHERE atom == ion "
     conn.execute(clean_fully_ionized_stmt)
 

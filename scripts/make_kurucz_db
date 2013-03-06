@@ -17,6 +17,7 @@ os.system('rm %s' % args.dbname)
 conn = construct_atom_db.new_linelist_from_gfall(args.dbname,gfall_fname=args.gfall)
 conn = construct_atom_db.create_levels(conn)
 conn = construct_atom_db.link_levels(conn)
+construct_atom_db.add_fully_ionized_levels(conn)
 conn.commit()
 
 conn.close()

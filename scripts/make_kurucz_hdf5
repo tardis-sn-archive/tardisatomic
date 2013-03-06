@@ -238,7 +238,7 @@ lines_data = lines_data.set_index('line_id')
 
 hdf5_file['lines_data'] = lines_data.reset_index().to_records(index=False)
 hdf5_file['levels_data'] = levels_data.reset_index().to_records(index=False)
-
+1/0
 
 #Culling all levels above the ionization threshold (auto-ionizing levels)
 
