@@ -34,10 +34,6 @@ SELECT
     label_lower
 FROM
     kurucz_lines.gfall
-
-WHERE
-    loggf > %(loggf_thresh).2f
-    %(where_stmt)s
 """
 
 linelist_insert_stmt = """
@@ -85,7 +81,7 @@ SET
 """
     
     
-def new_linelist_from_gfall(new_dbname, gfall_fname=None, loggf_threshold=-5, select_atom=None):
+def new_linelist_from_gfall(new_dbname, gfall_fname=None, select_atom=None):
     print "Reading lines from Kurucz gfall"
     conn = sqlite3.connect(new_dbname)
     conn.create_function('pow', 2, math.pow)
@@ -100,7 +96,7 @@ def new_linelist_from_gfall(new_dbname, gfall_fname=None, loggf_threshold=-5, se
         elem_select_stmt = ""
     else:
         elem_select_stmt = " and elem in (%s)" % (','.join(map(str, select_atom)),)
-    insert_fromgfall_stmt = linelist_insert_stmt + linelist_select_stmt % {'hc':hc, 'loggf_thresh':loggf_threshold, 'where_stmt':elem_select_stmt} 
+    insert_fromgfall_stmt = linelist_insert_stmt + linelist_select_stmt % {'hc':hc, 'where_stmt':elem_select_stmt}
     
     if sqlparse_available:
         print sqlparse.format(insert_fromgfall_stmt, reindent=True)
@@ -158,6 +154,7 @@ FROM
 
 def add_fully_ionized_levels(conn):
     #Clean first
+    print "Adding fully ionized levels for H and He"
     clean_fully_ionized_stmt = "DELETE FROM levels WHERE atom == ion "
     conn.execute(clean_fully_ionized_stmt)
 
@@ -488,12 +485,12 @@ def ion_xs(conn):
     curs.execute(ion_xs_creat_supporter)
 
 
-    atomdata = np.array(curs.execute('SELECT level_id,atom,ion FROM levels').fetchall())
+    atomdata = np.array(curs.execute('SELECT atom, ion, level_id FROM levels').fetchall())
 
     cx = import_ionDB.analytic_cross_section(atomdata[:,1],atomdata[:,1] - atomdata[:,2],0.8)
     final = np.concatenate((atomdata,cx[:,None]),axis=1)
     for i in final:
-        curs.execute('INSERT OR IGNORE INTO ion_cx (level_id, atom, ion, cx_threshold) VALUES (?,?,?,?)',(int(i[0]),int(i[1]),int(i[2]),i[3]))
+        curs.execute('INSERT OR IGNORE INTO ion_cx (level_id, atom, ion, cx_threshold) VALUES (?,?,?,?)',(int(i[2]),int(i[0]),int(i[1]),i[3]))
     conn.commit()
     return conn
 

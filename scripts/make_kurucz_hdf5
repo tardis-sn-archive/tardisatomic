@@ -34,6 +34,8 @@ parser.add_argument('--loggf_threshold', default=-3., help='log(gf) threshold')
 parser.add_argument('--include_zeta', action='store_true', default=False, help='include recombination coefficients (zeta)')
 parser.add_argument('--include_collision', action='store_true', default=False, help='include collision rates')
 parser.add_argument('--build_macro', action='store_true', default=False, help='build macro atom table into the file')
+parser.add_argument('--max_atomic_number', default=30, help=('Setting the maximum atomic number to be stored in the HDF5'
+            'file. For now 30 is the limit as I don\'t have reliable ionization data for anything above.'))
 parser.add_argument('--synpp_refs', help='point to the synpp_refs.dat')
 parser.add_argument('--include_ion_cx', action='store_true', default=False, help='include ionization cross sections (ion_cx)')
 
@@ -80,14 +82,19 @@ else:
 basic_atom_data_fname = os.path.join(os.path.dirname(sql_stmts.__file__), 'data', 'atom_data_basic.h5')
 zeta_datafile = os.path.join(os.path.dirname(sql_stmts.__file__), 'data', 'knox_long_recombination_zeta.dat')
 
+
+####### Opening HDF5 file  ##########################
 if os.path.exists(args.hdf5):
     print "HDF5 File exists - this procedure will overwrite it"
     if raw_input('Okay? [Y/n]').lower().startswith('n'):
         sys.exit(0)
-
 os.system('cp %s %s' % (basic_atom_data_fname, args.hdf5))
 hdf5_file = h5py.File(args.hdf5)
+######################################################
 
+
+ionization_data = pd.DataFrame(hdf5_file['ionization_data'].__array__())
+ionization_data.set_index(['atomic_number', 'ion_number'], inplace=True)
 
 if not os.path.exists(args.atom_db):
     raise ValueError('Database %s does not exist' % args.atom_db)
@@ -99,11 +106,12 @@ try:
 except sqlite3.OperationalError as e:
     print e
 
-line_list_sql_stmt = ('select id, wl, atom, ion, f_ul, f_lu, level_id_lower, level_id_upper from lines')
-#line_list_sql_stmt += 'where  loggf > %s ' % args.loggf_threshold
+lines_data_sql_stmt = ('select id, wl, atom, ion, f_ul, f_lu, level_id_lower, level_id_upper from lines')
+#lines_data_sql_stmt += 'where  loggf > %s ' % args.loggf_threshold
 
 
 where_stmt = ['loggf > %s' % args.loggf_threshold]
+where_stmt += ['atom <= %d' % args.max_atomic_number]
 
 if ion_filter_stmt != '':
     where_stmt.append(ion_filter_stmt)
@@ -111,27 +119,44 @@ if atom_filter_stmt != '':
     where_stmt.append(atom_filter_stmt)
 
 if where_stmt != []:
-    line_list_sql_stmt += ' where %s' % ' and '.join(where_stmt)
+    lines_data_sql_stmt += ' where %s' % ' and '.join(where_stmt)
 
-line_list_sql_stmt += ' order by wl'
+lines_data_sql_stmt += ' order by wl'
 
 
-print line_list_sql_stmt
+print lines_data_sql_stmt
 
-line_list_dtype = [('line_id', np.int), ('wavelength', np.float), ('atomic_number', np.int), ('ion_number', np.int), ('f_ul', np.float),
+lines_data_dtype = [('line_id', np.int), ('wavelength', np.float), ('atomic_number', np.int), ('ion_number', np.int), ('f_ul', np.float),
                    ('f_lu', np.float), ('level_number_lower', np.int), ('level_number_upper', np.int)]
 
-line_list_units = ('1', 'angstrom', '1', '1', '1', '1', '1', '1')
-line_list = conn.execute(line_list_sql_stmt).fetchall()
-line_list = np.array(line_list, dtype=line_list_dtype)
+#lines_data_units = ('1', 'angstrom', '1', '1', '1', '1', '1', '1')
+
+lines_data = conn.execute(lines_data_sql_stmt).fetchall()
+lines_data = pd.DataFrame(np.array(lines_data, dtype=lines_data_dtype))
+
+einstein_coeff = (4 * np.pi ** 2 * constants.e.gauss.value ** 2) / (
+    constants.m_e.cgs.value * constants.c.cgs.value)
+
+lines_data['nu'] = units.Unit('angstrom').to('Hz', lines_data['wavelength'], units.spectral())
+lines_data['B_lu'] = lines_data['f_lu'] * einstein_coeff / (constants.h.cgs.value * lines_data['nu'])
+lines_data['B_ul'] = lines_data['f_ul'] * einstein_coeff / (constants.h.cgs.value * lines_data['nu'])
+lines_data['A_ul'] = einstein_coeff * 2 * lines_data['nu'] ** 2 / constants.c.cgs.value ** 2 * lines_data['f_ul']
 
 
-hdf5_file['lines_data'] = line_list
-hdf5_file['lines_data'].attrs['units'] = line_list_units
 
-levels_sql_stmt = 'select atom, ion, level_id, energy, g, metastable from levels '
+lines_data_level_number_upper = lines_data.set_index(['atomic_number', 'ion_number', 'level_number_upper'])
+lines_data_level_number_upper = lines_data_level_number_upper.groupby(level=['atomic_number', 'ion_number', 'level_number_upper'])
 
-where_stmt = []
+lines_data_level_number_lower = lines_data.set_index(['atomic_number', 'ion_number', 'level_number_lower'])
+lines_data_level_number_lower = lines_data_level_number_lower.groupby(level=['atomic_number', 'ion_number', 'level_number_lower'])
+
+#lines_data = lines_data.set_index('line_id')
+
+
+
+levels_sql_stmt = 'select atom, ion, level_id, energy, g from levels '
+
+where_stmt = ['atom <= %d' % args.max_atomic_number]
 
 if ion_filter_stmt != '':
     where_stmt.append(ion_filter_stmt)
@@ -150,16 +175,73 @@ levels_sql_stmt += ' ORDER BY atom,ion, level_id'
 print levels_sql_stmt
 
 levels_dtype = [('atomic_number', np.int), ('ion_number', np.int), ('level_number', np.int),
-                ('energy', np.float), ('g', np.int), ('metastable', np.bool)]
-levels_units = ('1', '1', '1', 'eV', '1', '1')
+                ('energy', np.float), ('g', np.int)]
+#levels_units = ('1', '1', '1', 'eV', '1', '1')
 
 
-levels_list = conn.execute(levels_sql_stmt).fetchall()
-levels_list = np.array(levels_list, dtype=levels_dtype)
+levels_data = conn.execute(levels_sql_stmt).fetchall()
+levels_data = np.array(levels_data, dtype=levels_dtype)
+levels_data = pd.DataFrame(levels_data)
+levels_data.set_index(['atomic_number', 'ion_number', 'level_number'], inplace=True)
 
-hdf5_file['levels_data'] = levels_list
-hdf5_file['levels_data'].attrs['units'] = levels_units
+print "Creating metastable flags"
+count_down = lines_data_level_number_upper['line_id'].count()
+levels_data['metastable'] = count_down == 0
+levels_data['metastable'] = pd.isnull(levels_data['metastable'])
 
+
+levels_atom_ion_index = zip(levels_data.index.get_level_values('atomic_number'),
+                            levels_data.index.get_level_values('ion_number').values + 1)
+
+levels_ionization_energy = ionization_data.ix[levels_atom_ion_index]
+levels_ionization_energy = levels_ionization_energy.values.reshape(levels_ionization_energy.shape[0])
+
+auto_ionizing_levels_mask = (levels_data.energy >= levels_ionization_energy).values
+
+auto_ionizing_levels = levels_data[auto_ionizing_levels_mask]
+
+auto_ionizing_line_ids = []
+
+for index in auto_ionizing_levels.index:
+    index_in_lines = False
+    try:
+        line_group = lines_data_level_number_upper.get_group(index)
+    except KeyError:
+        pass
+    else:
+        auto_ionizing_line_ids += line_group.line_id.values.tolist()
+        index_in_lines = True
+
+    try:
+        line_group = lines_data_level_number_lower.get_group(index)
+    except KeyError:
+        pass
+    else:
+        auto_ionizing_line_ids += line_group.line_id.values.tolist()
+        index_in_lines = True
+
+    if not index_in_lines:
+        print "INDEX %s not in lines" % (index,)
+
+
+auto_ionizing_line_ids = np.unique(auto_ionizing_line_ids)
+lines_data = lines_data[~lines_data.reset_index().line_id.isin(auto_ionizing_line_ids).values]
+levels_data = levels_data[~auto_ionizing_levels_mask]
+
+lines_data_level_number_upper = lines_data.set_index(['atomic_number', 'ion_number', 'level_number_upper'])
+lines_data_level_number_upper = lines_data_level_number_upper.groupby(level=['atomic_number', 'ion_number', 'level_number_upper'])
+
+lines_data_level_number_lower = lines_data.set_index(['atomic_number', 'ion_number', 'level_number_lower'])
+lines_data_level_number_lower = lines_data_level_number_lower.groupby(level=['atomic_number', 'ion_number', 'level_number_lower'])
+
+lines_data = lines_data.set_index('line_id')
+
+
+hdf5_file['lines_data'] = lines_data.reset_index().to_records(index=False)
+hdf5_file['levels_data'] = levels_data.reset_index().to_records(index=False)
+1/0
+
+#Culling all levels above the ionization threshold (auto-ionizing levels)
 
 #load zeta
 if args.include_zeta:
@@ -170,35 +252,6 @@ if args.include_zeta:
 
 
 if args.build_macro:
-    probability_set = []
-
-    nus = units.Unit('angstrom').to('Hz', line_list['wavelength'], units.spectral())
-
-
-    level_ids = []
-
-    macro_select_levels = """select
-                                id, wl, ?, f_lu, f_ul, level_id_{destination_relation}
-                            from
-                                lines
-
-                            where
-                             atom=? and ion=? and level_id_{source_relation}=?
-                            and
-                                loggf > {loggf_thresh}"""
-
-    macro_select_energy = """select
-                                energy, g
-                            from
-                                levels
-                            where
-                                atom=?
-                                and ion=?
-                                and level_id=?"""
-
-
-    level_id_dtype = [('line_id', np.int), ('wavelength', np.float), ('f_lu', np.float), ('f_ul', np.float),
-                      ('source_level_id', np.int), ('destination_level_id', np.int)]
 
     macro_atom = OrderedDict()
     macro_atom['atomic_number'] = []
@@ -209,96 +262,79 @@ if args.build_macro:
     macro_atom['transition_probability'] = []
     macro_atom['transition_line_id'] = []
 
-    macro_atom_counts = OrderedDict()
-    macro_atom_counts['atomic_number'] = []
-    macro_atom_counts['ion_number'] = []
-    macro_atom_counts['source_level_number'] = []
-    macro_atom_counts['count_down'] = []
-    macro_atom_counts['count_up'] = []
-    macro_atom_counts['count_total'] = []
+    macro_atom_references = OrderedDict()
+    macro_atom_references['atomic_number'] = []
+    macro_atom_references['ion_number'] = []
+    macro_atom_references['source_level_number'] = []
+    macro_atom_references['count_down'] = []
+    macro_atom_references['count_up'] = []
+    macro_atom_references['count_total'] = []
+    current_atomic_number = 0
+    for index, (energy, g, metastable) in levels_data.iterrows():
+        if current_atomic_number != index[0]:
+            current_atomic_number = index[0]
+            print "Starting Atom %d" % current_atomic_number
 
-    last_atom = -1
-    for atom, ion, level_id, energy, g in conn.execute('select atom, ion, level_id, energy, g from levels order by atom, ion, level_id'):
-        if last_atom != atom:
-            print "new atom %d" % atom
+        try:
+            down_transitions = lines_data_level_number_upper.get_group(index)
+        except KeyError:
+            down_level_count = 0
+        else:
+            macro_atom['atomic_number'] += down_transitions.index.get_level_values('atomic_number').tolist() * 2
+            macro_atom['ion_number'] += down_transitions.index.get_level_values('ion_number').tolist() * 2
+            macro_atom['source_level_number'] += down_transitions.index.get_level_values('level_number_upper').tolist() * 2
+            macro_atom['destination_level_number'] += down_transitions.level_number_lower.tolist() * 2
+            down_index = [(index[0], index[1], down_index) for down_index in down_transitions.level_number_lower.tolist()]
+            down_level_count = down_transitions.level_number_lower.count()
+            macro_atom['transition_type'] += [-1] * down_level_count
+            macro_atom['transition_type'] += [0] * down_level_count
+            nus = lines_data.nu.ix[down_transitions.line_id.values].values
+            f_ul = lines_data.f_ul.ix[down_transitions.line_id.values].values
+            e_lower = levels_data.ix[down_index]['energy'].values
+            macro_atom['transition_probability'] += list(2 * nus**2 * f_ul / constants.c.cgs.value**2 * (energy - e_lower))
+            macro_atom['transition_probability'] += list(2 * nus**2 * f_ul / constants.c.cgs.value**2 * e_lower)
 
+            macro_atom['transition_line_id'] += down_transitions.line_id.tolist() * 2
 
-        macro_atom_counts['atomic_number'].append(atom)
-        macro_atom_counts['ion_number'].append(ion)
+        try:
+            up_transitions = lines_data_level_number_lower.get_group(index)
+        except KeyError:
+            up_level_count = 0
+        else:
+            macro_atom['atomic_number'] += up_transitions.index.get_level_values('atomic_number').tolist()
+            macro_atom['ion_number'] += up_transitions.index.get_level_values('ion_number').tolist()
+            macro_atom['source_level_number'] += up_transitions.index.get_level_values('level_number_lower').tolist()
+            macro_atom['destination_level_number'] += up_transitions.level_number_upper.tolist()
+            up_level_count = up_transitions.level_number_upper.count()
+            macro_atom['transition_type'] += [1] * up_level_count
 
-        last_atom = atom
-        #p_down ->
+            nus = lines_data.nu.ix[up_transitions.line_id.values].values
+            f_lu = lines_data.f_lu.ix[up_transitions.line_id.values].values
 
+            macro_atom['transition_probability'] += list(f_lu * energy / (constants.h.cgs.value * nus))
 
+            macro_atom['transition_line_id'] += up_transitions.line_id.tolist()
 
-        macro_select_levels_fmt = macro_select_levels.format(source_relation='upper', destination_relation='lower',
-                                                             loggf_thresh=args.loggf_threshold)
-        level_id_wl = conn.execute(macro_select_levels_fmt, (level_id, atom, ion, level_id)).fetchall()
-        level_id_wl = np.array(level_id_wl, dtype=level_id_dtype)
-        nu = units.Unit('Angstrom').to('Hz', level_id_wl['wavelength'], units.spectral())
+        macro_atom_references['atomic_number'].append(index[0])
+        macro_atom_references['ion_number'].append(index[1])
+        macro_atom_references['source_level_number'].append(index[2])
+        macro_atom_references['count_down'].append(down_level_count)
+        macro_atom_references['count_up'].append(up_level_count)
+        macro_atom_references['count_total'].append(2*down_level_count + up_level_count)
 
-        destination_level_energy_g = [conn.execute(macro_select_energy, (atom, ion, int(cur_level_id))).fetchone() for cur_level_id in level_id_wl['destination_level_id']]
-        destination_level_energy_g = np.array(destination_level_energy_g, dtype=[('energy', np.float), ('g', np.float)])
-
-        p_emission_down = (2*nu**2/constants.c.cgs.value**2)*(destination_level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', (energy - destination_level_energy_g['energy']))
-        p_internal_down = (2*nu**2/constants.c.cgs.value**2)*(destination_level_energy_g['g'] / g) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', destination_level_energy_g['energy'])
-
-
-        macro_atom_counts['source_level_number'].append(level_id)
-        macro_atom_counts['count_down'].append(len(nu))
-        macro_atom['atomic_number'] += [atom]*len(nu)*2
-        macro_atom['ion_number'] += [ion]*len(nu)*2
-        macro_atom['source_level_number']+= [level_id]*len(nu)*2
-        #for p_emission_down and p_internal_down
-        macro_atom['destination_level_number']+= list(level_id_wl['destination_level_id'])*2
-
-
-
-        macro_atom['transition_type'] += [-1]*len(nu)
-        macro_atom['transition_type'] += [0]*len(nu)
-
-        macro_atom['transition_probability'] += list(p_emission_down)
-        macro_atom['transition_probability'] += list(p_internal_down)
-
-        macro_atom['transition_line_id'] += list(level_id_wl['line_id'])*2
-
-
-        macro_select_levels_fmt = macro_select_levels.format(source_relation='lower', destination_relation='upper',
-                                                             loggf_thresh=args.loggf_threshold)
-
-        level_id_wl = conn.execute(macro_select_levels_fmt, (level_id, atom, ion, level_id)).fetchall()
-        level_id_wl = np.array(level_id_wl, dtype=level_id_dtype)
-        nu = units.Unit('Angstrom').to('Hz', level_id_wl['wavelength'], units.spectral())
-
-        destination_level_energy_g = [conn.execute(macro_select_energy, (atom, ion, int(cur_level_id))).fetchone() for cur_level_id in level_id_wl['destination_level_id']]
-        destination_level_energy_g = np.array(destination_level_energy_g, dtype=[('energy', np.float), ('g', np.float)])
-
-        p_internal_up = 1/(constants.h.cgs.value*nu) * level_id_wl['f_lu'] * units.Unit('eV').to('erg', energy)
+    hdf5_file['macro_atom_data'] = pd.DataFrame(macro_atom).to_records(index=False)
+    hdf5_file['macro_atom_references'] = pd.DataFrame(macro_atom_references).to_records(index=False)
 
 
-        macro_atom_counts['count_up'].append(len(nu))
-        macro_atom['atomic_number'] += [atom]*len(nu)
-        macro_atom['ion_number'] += [ion]*len(nu)
-        macro_atom['source_level_number']+= [level_id]*len(nu)
-        #for p_emission_down and p_internal_down
-        macro_atom['destination_level_number']+= list(level_id_wl['destination_level_id'])
-        macro_atom['transition_type'] += [1]*len(nu)
-        macro_atom['transition_probability'] += list(p_internal_up)
-
-        macro_atom['transition_line_id'] += list(level_id_wl['line_id'])
-
-
-        macro_atom_counts['count_total'].append(2*macro_atom_counts['count_down'][-1] + macro_atom_counts['count_up'][-1])
-
-    macro_atom_table = table.Table(macro_atom)
-
-    macro_atom_counts_table = table.Table(macro_atom_counts)
-
-    hdf5_file['macro_atom_data'] = macro_atom_table.__array__()
-    hdf5_file['macro_atom_references'] = macro_atom_counts_table.__array__()
 
 
 if args.include_collision:
+
+    collision_data_exists = conn.execute('select count(name) from sqlite_master where name="collision_data"').fetchone()[0]
+
+    if collision_data_exists == 0:
+        print "WARNING: Collision data requested but not in the database"
+    elif collision_data_exists == 1:
     collision_columns = zip(*conn.execute('pragma table_info(collision_data)').fetchall())[1]
 
     temperature_columns = [item for item in collision_columns if item.startswith('t')]
@@ -329,10 +365,10 @@ if args.synpp_refs is not None:
 
     synpp_line_ids = []
     for atom, ion, wl in zip(synpp_atom, synpp_ion, synpp_line):
-        current_line_list = line_list[(line_list['atomic_number']==atom) & (line_list['ion_number'] == ion)]
-        if current_line_list == []:
+        current_lines_data = lines_data[(lines_data['atomic_number']==atom) & (lines_data['ion_number'] == ion)]
+        if current_lines_data == []:
             raise ValueError('Fix incomplete linelist later')
-        synpp_line_ids.append(current_line_list['line_id'][np.argmin(np.abs(current_line_list['wavelength'] - wl))])
+        synpp_line_ids.append(current_lines_data['line_id'][np.argmin(np.abs(current_lines_data['wavelength'] - wl))])
 
     synpp_ref = np.array(zip(synpp_atom, synpp_ion, synpp_line, synpp_line_ids),
                          dtype=[('atomic_number', np.int64), ('ion_number', np.int64), ('wavelength', np.float64), ('line_id', np.int64)])
@@ -342,8 +378,8 @@ if args.synpp_refs is not None:
 if args.include_ion_cx:
     select_ion_cx_th = 'SELECT levels.atom, levels.ion, levels.level_id, ion_cx.cx_threshold FROM levels, ion_cx WHERE levels.level_id = ion_cx.level_id AND ion_cx.atom = levels.atom AND ion_cx.ion = levels.ion'
     select_ion_cx_sp = 'SELECT levels.atom, levels.ion, levels.level_id, ion_cx.cx_threshold, ion_cx_supporter.nu, ion_cx_supporter.xs  FROM ion_cx_supporter INNER JOIN ion_cx ON ion_cx_supporter.ion_cx_id = ion_cx.id INNER JOIN levels ON ion_cx.level_id = levels.level_id AND ion_cx.atom = levels.atom AND ion_cx.ion = levels.ion'
-    ion_cx_th_dtype = [('atom',np.int),('ion',np.int),('level_id',np.int),('ion_cx_threshold',np.float)]
-    ion_cx_sp_dtype = [('atom',np.int),('ion',np.int),('level_id',np.int),('ion_cx_threshold',np.float),('nu',np.float),('xs',np.float)]
+    ion_cx_th_dtype = [('atomic_number',np.int),('ion_number',np.int),('level_id',np.int),('ion_cx_threshold',np.float)]
+    ion_cx_sp_dtype = [('atomic_number',np.int),('ion_number',np.int),('level_id',np.int),('ion_cx_threshold',np.float),('nu',np.float),('xs',np.float)]
     ion_cx_th_data = conn.execute(select_ion_cx_th).fetchall()
     ion_cx_th_data = np.array(ion_cx_th_data, ion_cx_th_dtype)
     ion_cx_sp_data = conn.execute(select_ion_cx_sp).fetchall()
