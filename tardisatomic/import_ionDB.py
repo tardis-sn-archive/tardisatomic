@@ -6,11 +6,13 @@ import math
 
 import argparse
 import numpy as np
+np.seterr(all='raise')
 import h5py
 import os
 import sys
 import sqlite3
 import re
+
 
 class Cache(object):
 
@@ -26,6 +28,7 @@ class Cache(object):
     def __call__(self, func):
         self.func = func
         return self.cachedFunc
+
 
 
 @np.vectorize

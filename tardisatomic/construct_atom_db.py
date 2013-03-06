@@ -487,7 +487,7 @@ def ion_xs(conn):
 
     atomdata = np.array(curs.execute('SELECT atom, ion, level_id FROM levels').fetchall())
 
-    cx = import_ionDB.analytic_cross_section(atomdata[:,1],atomdata[:,1] - atomdata[:,2],0.8)
+    cx = import_ionDB.analytic_cross_section(atomdata[:,0],atomdata[:,0] - atomdata[:,1],0.8)
     final = np.concatenate((atomdata,cx[:,None]),axis=1)
     for i in final:
         curs.execute('INSERT OR IGNORE INTO ion_cx (level_id, atom, ion, cx_threshold) VALUES (?,?,?,?)',(int(i[2]),int(i[0]),int(i[1]),i[3]))
