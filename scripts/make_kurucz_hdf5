@@ -37,6 +37,7 @@ parser.add_argument('--build_macro', action='store_true', default=False, help='b
 parser.add_argument('--max_atomic_number', default=30, help=('Setting the maximum atomic number to be stored in the HDF5'
             'file. For now 30 is the limit as I don\'t have reliable ionization data for anything above.'))
 parser.add_argument('--synpp_refs', help='point to the synpp_refs.dat')
+parser.add_argument('--include_ion_cx', action='store_true', default=False, help='include ionization cross sections (ion_cx)')
 
 atom_group = parser.add_mutually_exclusive_group()
 
@@ -420,6 +421,17 @@ if args.synpp_refs is not None:
 
     hdf5_file['synpp_refs'] = synpp_ref
 
+if args.include_ion_cx:
+    select_ion_cx_th = 'SELECT levels.atom, levels.ion, levels.level_id, ion_cx.cx_threshold FROM levels, ion_cx WHERE levels.level_id = ion_cx.level_id AND ion_cx.atom = levels.atom AND ion_cx.ion = levels.ion'
+    select_ion_cx_sp = 'SELECT levels.atom, levels.ion, levels.level_id, ion_cx.cx_threshold, ion_cx_supporter.nu, ion_cx_supporter.xs  FROM ion_cx_supporter INNER JOIN ion_cx ON ion_cx_supporter.ion_cx_id = ion_cx.id INNER JOIN levels ON ion_cx.level_id = levels.level_id AND ion_cx.atom = levels.atom AND ion_cx.ion = levels.ion'
+    ion_cx_th_dtype = [('atomic_number',np.int),('ion_number',np.int),('level_id',np.int),('ion_cx_threshold',np.float)]
+    ion_cx_sp_dtype = [('atomic_number',np.int),('ion_number',np.int),('level_id',np.int),('ion_cx_threshold',np.float),('nu',np.float),('xs',np.float)]
+    ion_cx_th_data = conn.execute(select_ion_cx_th).fetchall()
+    ion_cx_th_data = np.array(ion_cx_th_data, ion_cx_th_dtype)
+    ion_cx_sp_data = conn.execute(select_ion_cx_sp).fetchall()
+    ion_cx_sp_data = np.array(ion_cx_sp_data, ion_cx_sp_dtype)
+    hdf5_file['ionization_cx_threshold'] = ion_cx_th_data
+    hdf5_file['ionization_cx_support'] = ion_cx_sp_data
 
 
 
@@ -436,8 +448,6 @@ for dataset in hdf5_file.values():
 
 
 uuid1 = uuid.uuid1().hex
-
-
 
 hdf5_file.attrs['md5'] = md5_hash.hexdigest()
 hdf5_file.attrs['uuid1'] = uuid1

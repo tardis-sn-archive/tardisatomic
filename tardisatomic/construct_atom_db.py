@@ -3,6 +3,7 @@ import sqlite3
 import math
 import numpy as np
 import macro_atom_transition
+from tardisatomic import import_ionDB
 
 gfall_db = os.path.join(os.path.dirname(__file__), 'data', 'gfall.db3')
 zeta_datafile = os.path.join(os.path.dirname(__file__), 'data', 'knox_long_recombination_zeta.dat')
@@ -467,4 +468,35 @@ def read_zeta(conn):
                      (atom, ion, sqlite3.Binary(z_data.tostring())))
     conn.commit()
     return conn
+
+def ion_xs(conn):
+    print("Creating the ionization cross section table.")
+    ion_xs_create_table = """
+    CREATE TABLE ion_cx(id INTEGER PRIMARY KEY, level_id INTEGER, atom INTEGER, ion INTEGER, cx_threshold FLOAT, FOREIGN KEY(level_id, atom, ion) REFERENCES levels(level_id, atom, ion))
+    """
+    ion_xs_creat_supporter = """
+    CREATE TABLE ion_cx_supporter(id INTEGER PRIMARY KEY, ion_cx_id INTEGER , nu FLOAT , xs FLOAT, FOREIGN KEY(ion_cx_id) REFERENCES ion_cx(id))
+    """
+
+
+    curs = conn.cursor()
+    #curs.execute('PRAGMA foreign_keys = ON')
+    curs.execute(ion_xs_create_table)
+    curs.execute(ion_xs_creat_supporter)
+
+
+    atomdata = np.array(curs.execute('SELECT atom, ion, level_id FROM levels').fetchall())
+
+    cx = import_ionDB.analytic_cross_section(atomdata[:,0],atomdata[:,0] - atomdata[:,1],0.8)
+    final = np.concatenate((atomdata,cx[:,None]),axis=1)
+    for i in final:
+        curs.execute('INSERT OR IGNORE INTO ion_cx (level_id, atom, ion, cx_threshold) VALUES (?,?,?,?)',(int(i[2]),int(i[0]),int(i[1]),i[3]))
+    conn.commit()
+    return conn
+
+
+
+
+
+
     
