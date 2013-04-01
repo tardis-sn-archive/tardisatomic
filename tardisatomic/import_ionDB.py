@@ -8,7 +8,8 @@ import argparse
 import numpy as np
 #Taken out due to chianti.
 #TODO make it work with seterr(all='raise')
-#np.seterr(all='raise')
+np.seterr(all='warn')
+
 import h5py
 import os
 import sys
