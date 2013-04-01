@@ -27,6 +27,9 @@ def read_chianti(symbol, ion_number, level_observed=True, temperatures = np.lins
         levels_data['energy'] = units.Unit('cm').to('eV', 1 / np.array(ion_data.Elvlc['ecmth']), units.spectral())
     levels_data['g'] = 2*np.array(ion_data.Elvlc['j']) + 1
 
+    if levels_data['energy'][0] != 0.0:
+        raise ValueError('Level 0 energy is not 0.0')
+
     levels_data = pd.DataFrame(levels_data)
     levels_data.set_index('level_number', inplace=True)
 
