@@ -276,6 +276,15 @@ lines_data_level_number_lower = lines_data_level_number_lower.groupby(level=['at
 lines_data.level_number_lower = levels_prev_index.ix[lines_data_level_number_lower_index].values
 lines_data.level_number_upper = levels_prev_index.ix[lines_data_level_number_upper_index].values
 
+
+lines_data_level_number_upper = lines_data.set_index(['atomic_number', 'ion_number', 'level_number_upper'])
+lines_data_level_number_upper_index = lines_data_level_number_upper.index.copy()
+lines_data_level_number_upper = lines_data_level_number_upper.groupby(level=['atomic_number', 'ion_number', 'level_number_upper'])
+
+lines_data_level_number_lower = lines_data.set_index(['atomic_number', 'ion_number', 'level_number_lower'])
+lines_data_level_number_lower_index  = lines_data_level_number_lower.index.copy()
+lines_data_level_number_lower = lines_data_level_number_lower.groupby(level=['atomic_number', 'ion_number', 'level_number_lower'])
+
 lines_data = lines_data.set_index('line_id')
 levels_data = levels_data.reset_index().set_index(['atomic_number', 'ion_number', 'level_number'])
 
