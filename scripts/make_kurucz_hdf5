@@ -110,7 +110,7 @@ lines_data_sql_stmt = ('select id, wl, atom, ion, f_ul, f_lu, loggf, level_id_lo
 #lines_data_sql_stmt += 'where  loggf > %s ' % args.loggf_threshold
 
 
-#where_stmt = ['loggf > %s' % args.loggf_threshold]
+
 where_stmt = ['atom <= %d' % args.max_atomic_number]
 
 if ion_filter_stmt != '':
