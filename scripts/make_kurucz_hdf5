@@ -30,7 +30,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('hdf5', help='HDF5 file that is created')
 parser.add_argument('atom_db', help='atom_db')
-parser.add_argument('--loggf_threshold', default=-3., help='log(gf) threshold')
+parser.add_argument('--kurucz_loggf_threshold', default=-3., help='log(gf) threshold for the kurucz dataset')
 parser.add_argument('--include_zeta', action='store_true', default=False, help='include recombination coefficients (zeta)')
 parser.add_argument('--include_collision', action='store_true', default=False, help='include collision rates')
 parser.add_argument('--build_macro', action='store_true', default=False, help='build macro atom table into the file')
@@ -106,12 +106,12 @@ try:
 except sqlite3.OperationalError as e:
     print e
 
-lines_data_sql_stmt = ('select id, wl, atom, ion, f_ul, f_lu, level_id_lower, level_id_upper from lines')
+lines_data_sql_stmt = ('select id, wl, atom, ion, f_ul, f_lu, loggf, level_id_lower, level_id_upper, source from lines')
 #lines_data_sql_stmt += 'where  loggf > %s ' % args.loggf_threshold
 
 
-where_stmt = ['loggf > %s' % args.loggf_threshold]
-where_stmt += ['atom <= %d' % args.max_atomic_number]
+
+where_stmt = ['atom <= %d' % args.max_atomic_number]
 
 if ion_filter_stmt != '':
     where_stmt.append(ion_filter_stmt)
@@ -127,12 +127,14 @@ lines_data_sql_stmt += ' order by wl'
 print lines_data_sql_stmt
 
 lines_data_dtype = [('line_id', np.int), ('wavelength', np.float), ('atomic_number', np.int), ('ion_number', np.int), ('f_ul', np.float),
-                   ('f_lu', np.float), ('level_number_lower', np.int), ('level_number_upper', np.int)]
+                   ('f_lu', np.float), ('loggf', np.float), ('level_number_lower', np.int), ('level_number_upper', np.int), ('source', '|S64')]
 
-#lines_data_units = ('1', 'angstrom', '1', '1', '1', '1', '1', '1')
 
 lines_data = conn.execute(lines_data_sql_stmt).fetchall()
-lines_data = pd.DataFrame(np.array(lines_data, dtype=lines_data_dtype))
+lines_data = np.array(lines_data, dtype=lines_data_dtype)
+
+lines_data = pd.DataFrame(lines_data)
+
 
 einstein_coeff = (4 * np.pi ** 2 * constants.e.gauss.value ** 2) / (
     constants.m_e.cgs.value * constants.c.cgs.value)
@@ -154,7 +156,7 @@ lines_data_level_number_lower = lines_data_level_number_lower.groupby(level=['at
 
 
 
-levels_sql_stmt = 'select atom, ion, level_id, energy, g from levels '
+levels_sql_stmt = 'select atom, ion, level_id, energy, g, source from levels '
 
 where_stmt = ['atom <= %d' % args.max_atomic_number]
 
@@ -175,7 +177,7 @@ levels_sql_stmt += ' ORDER BY atom,ion, level_id'
 print levels_sql_stmt
 
 levels_dtype = [('atomic_number', np.int), ('ion_number', np.int), ('level_number', np.int),
-                ('energy', np.float), ('g', np.int)]
+                ('energy', np.float), ('g', np.int), ('source', '|S64')]
 #levels_units = ('1', '1', '1', 'eV', '1', '1')
 
 
@@ -189,7 +191,7 @@ count_down = lines_data_level_number_upper['line_id'].count()
 levels_data['metastable'] = count_down == 0
 levels_data['metastable'] = pd.isnull(levels_data['metastable'])
 
-
+#culling autoionizing
 levels_atom_ion_index = zip(levels_data.index.get_level_values('atomic_number'),
                             levels_data.index.get_level_values('ion_number').values + 1)
 
@@ -201,6 +203,8 @@ auto_ionizing_levels_mask = (levels_data.energy >= levels_ionization_energy).val
 auto_ionizing_levels = levels_data[auto_ionizing_levels_mask]
 
 auto_ionizing_line_ids = []
+#Culling lines_data with low gf values
+lines_data = lines_data[(lines_data.source!='kurucz') | (lines_data.loggf > args.kurucz_loggf_threshold)]
 print "Cleaning auto-ionizing"
 for index in auto_ionizing_levels.index:
     index_in_lines = False
@@ -287,6 +291,10 @@ lines_data_level_number_lower = lines_data_level_number_lower.groupby(level=['at
 
 lines_data = lines_data.set_index('line_id')
 levels_data = levels_data.reset_index().set_index(['atomic_number', 'ion_number', 'level_number'])
+
+del lines_data['loggf']
+del lines_data['source']
+del levels_data['source']
 
 hdf5_file['lines_data'] = lines_data.reset_index().to_records(index=False)
 hdf5_file['levels_data'] = levels_data.reset_index().to_records(index=False)

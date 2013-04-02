@@ -27,6 +27,9 @@ def read_chianti(symbol, ion_number, level_observed=True, temperatures = np.lins
         levels_data['energy'] = units.Unit('cm').to('eV', 1 / np.array(ion_data.Elvlc['ecmth']), units.spectral())
     levels_data['g'] = 2*np.array(ion_data.Elvlc['j']) + 1
 
+    if levels_data['energy'][0] != 0.0:
+        raise ValueError('Level 0 energy is not 0.0')
+
     levels_data = pd.DataFrame(levels_data)
     levels_data.set_index('level_number', inplace=True)
 
@@ -166,8 +169,8 @@ def insert_to_db(symbol, ion_number, conn, temperatures=None):
     levels_data, lines_data, collision_data = read_chianti(symbol, ion_number, temperatures=temperatures_data)
 
     for key, line in lines_data.iterrows():
-        curs.execute('insert into lines(wl, atom, ion, level_id_upper, level_id_lower, f_lu, f_ul, loggf) '
-                     'values(?, ?, ?, ?, ?, ?, ?, ?)',
+        curs.execute('insert into lines(wl, atom, ion, level_id_upper, level_id_lower, f_lu, f_ul, loggf, source) '
+                     'values(?, ?, ?, ?, ?, ?, ?, ?, "chianti")',
                      (line['wavelength'], atomic_number, ion_number-1,
                       line['level_number_upper']-1, line['level_number_lower']-1,
                       line['f_lu'], line['f_ul'], line['loggf']))
@@ -177,15 +180,15 @@ def insert_to_db(symbol, ion_number, conn, temperatures=None):
         count_down = curs.execute('select count(id) from lines where atom=? and ion=? and level_id_upper=?',
                      (atomic_number, ion_number-1, int(key-1))).fetchone()[0]
 
-        curs.execute('insert into levels(atom, ion, energy, g, level_id, metastable) values(?, ?, ?, ?, ?, ?)',
+        curs.execute('insert into levels(atom, ion, energy, g, level_id, metastable, source) values(?, ?, ?, ?, ?, ?, "chianti")',
                      (atomic_number, ion_number-1, level['energy'], level['g'], int(key-1), count_down == 0))
 
 
 
 
-    insert_stmt = 'insert into collision_data(atom, ion, level_number_lower, level_number_upper, %s, c_ul_conversion) values(%s)'
+    insert_stmt = 'insert into collision_data(source, atom, ion, level_number_lower, level_number_upper, %s, c_ul_conversion) values(%s)'
 
-    insert_stmt = insert_stmt % (', '.join(['t%06d' % item for item in temperatures_data]), ','.join('?' * (len(temperatures_data ) + 5)))
+    insert_stmt = insert_stmt % (', '.join(['t%06d' % item for item in temperatures_data]), ','.join('?' * (len(temperatures_data ) + 6)))
 
     for (level_number_lower, level_number_upper), collision_data in collision_data.iterrows():
         c_lu =  list(collision_data[:len(temperatures_data)].values)
@@ -193,7 +196,7 @@ def insert_to_db(symbol, ion_number, conn, temperatures=None):
         level_number_lower = collision_data[-2] - 1
         level_number_upper = collision_data[-1] - 1
 
-        collision_line_data = [atomic_number, ion_number-1, level_number_lower, level_number_upper] + c_lu + [C_ul_conversion]
+        collision_line_data = ["chianti", atomic_number, ion_number-1, level_number_lower, level_number_upper] + c_lu + [C_ul_conversion]
 
 
         curs.execute(insert_stmt, collision_line_data)
@@ -214,6 +217,7 @@ def create_collision_data_table(conn, temperatures=np.arange(2000, 50000, 2000))
 
 
     collision_data_table_stmt = """create table collision_data(id integer primary key,
+                                                source text,
                                                 atom integer,
                                                 ion integer,
                                                 level_number_upper integer,

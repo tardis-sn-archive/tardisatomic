@@ -6,7 +6,10 @@ import math
 
 import argparse
 import numpy as np
-np.seterr(all='raise')
+#Taken out due to chianti.
+#TODO make it work with seterr(all='raise')
+np.seterr(all='warn')
+
 import h5py
 import os
 import sys

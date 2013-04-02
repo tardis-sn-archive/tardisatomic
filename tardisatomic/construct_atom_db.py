@@ -31,7 +31,8 @@ SELECT
     label_upper,
     e_lower * %(hc).20f,
     cast(2*j_lower + 1 AS integer) AS g_lower,
-    label_lower
+    label_lower,
+    "kurucz"
 FROM
     kurucz_lines.gfall
 """
@@ -47,7 +48,8 @@ insert into
         label_upper,
         e_lower,
         g_lower,
-        label_lower)"""
+        label_lower,
+        source)"""
         
         
 linelist_create_stmt = """
@@ -69,7 +71,8 @@ CREATE TABLE
     label_lower text,
     level_id_lower integer default -1,
     global_level_id_lower integer default -1,
-    f_lu float)
+    f_lu float,
+    source text)
     """
 
 update_oscillator_stmt = """
@@ -124,7 +127,8 @@ CREATE TABLE
         g integer,
         label text,
         level_id integer,
-        metastable bool default NULL)"""
+        metastable bool default NULL,
+        source text)"""
 
 
 level_select_stmt= """
@@ -192,7 +196,7 @@ def create_levels(conn):
             old_atom = atom
             old_ion = ion
             i=0
-        conn.execute('insert into levels(atom, ion, energy, g, label, level_id) values(?, ?, ?, ?, ?, ?)', (atom, ion, energy, g , label, i)) 
+        conn.execute('insert into levels(atom, ion, energy, g, label, level_id, source) values(?, ?, ?, ?, ?, ?, "kurucz")', (atom, ion, energy, g , label, i))
     conn.execute('create index level_unique_idx on levels(atom, ion, energy, g, label)')
     conn.execute('create index level_global_idx on levels(id)')
     print('Creating fully ionized levels')
