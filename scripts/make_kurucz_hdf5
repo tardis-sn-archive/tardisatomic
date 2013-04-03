@@ -398,13 +398,13 @@ if args.include_collision:
 
         temperature_columns = [item for item in collision_columns if item.startswith('t')]
         temperatures = [float(item[1:]) for item in temperature_columns]
-        select_collision_stmt = "select atom, ion, level_number_upper, level_number_lower, c_ul_conversion, %s" \
+        select_collision_stmt = "select atom, ion, level_number_upper, level_number_lower, g_ratio, delta_e, %s" \
                                 " from collision_data"
 
         select_collision_stmt = select_collision_stmt % (', '.join(temperature_columns))
 
         collision_data_dtype = [('atomic_number', np.int), ('ion_number', np.int), ('level_number_upper', np.int),
-                                ('level_number_lower', np.int), ('c_ul_conversion', np.float)]
+                                ('level_number_lower', np.int), ('g_ratio', np.float), ('delta_e', np.float)]
 
         collision_data_dtype += [(str(item), np.float) for item in temperature_columns]
 

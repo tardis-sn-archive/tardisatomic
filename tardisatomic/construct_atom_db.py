@@ -2,7 +2,7 @@ import os
 import sqlite3
 import math
 import numpy as np
-import macro_atom_transition
+#import macro_atom_transition
 from tardisatomic import import_ionDB
 
 gfall_db = os.path.join(os.path.dirname(__file__), 'data', 'gfall.db3')
