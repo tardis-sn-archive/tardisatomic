@@ -121,7 +121,7 @@ def calculate_collisional_strength(splups_data, splups_idx, temperature, level_d
     spline_tck = interpolate.splrep(x_knots, y_knots)
 
     if ttype == 1:
-        x = 1 - np.log(c) / (kt/delta_E + c)
+        x = 1 - np.log(c) / np.log(kt/delta_E + c)
         y_func = interpolate.splev(x, spline_tck)
         upsilon = y_func * np.log(kt/delta_E + np.exp(1))
 
@@ -136,7 +136,7 @@ def calculate_collisional_strength(splups_data, splups_idx, temperature, level_d
         upsilon = y_func / (kt/delta_E + 1)
 
     elif ttype == 4:
-        x = 1 - np.log(c) / (kt/delta_E + c)
+        x = 1 - np.log(c) / np.log(kt/delta_E + c)
         y_func = interpolate.splev(x, spline_tck)
         upsilon = y_func * np.log(kt/delta_E + c)
 
@@ -146,7 +146,7 @@ def calculate_collisional_strength(splups_data, splups_idx, temperature, level_d
     #### 1992A&A...254..436B Equation 20 & 22 #####
 
     c_upper_lower = 8.63e-6 * upsilon  / (g_upper * temperature**.5)
-    g_ratio = (g_lower / float(g_upper))
+    g_ratio = float(g_upper) / float(g_lower)
     delta_Ek = delta_E / kb_ev
 
 
