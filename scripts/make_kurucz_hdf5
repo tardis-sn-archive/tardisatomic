@@ -31,6 +31,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('hdf5', help='HDF5 file that is created')
 parser.add_argument('atom_db', help='atom_db')
 parser.add_argument('--kurucz_loggf_threshold', default=-3., help='log(gf) threshold for the kurucz dataset')
+parser.add_argument('--metastable_loggf_threshold', default=-3., help='log(gf) threshold for flagging levels that are connected by lines metastable')
 parser.add_argument('--include_zeta', action='store_true', default=False, help='include recombination coefficients (zeta)')
 parser.add_argument('--include_collision', action='store_true', default=False, help='include collision rates')
 parser.add_argument('--build_macro', action='store_true', default=False, help='build macro atom table into the file')
@@ -187,9 +188,13 @@ levels_data = pd.DataFrame(levels_data)
 levels_data.set_index(['atomic_number', 'ion_number', 'level_number'], inplace=True)
 
 print "Creating metastable flags"
-count_down = lines_data_level_number_upper['line_id'].count()
+lines_data_level_number_upper_meta = lines_data[lines_data.loggf>args.metastable_loggf_threshold]
+lines_data_level_number_upper_meta = lines_data_level_number_upper_meta.groupby(['atomic_number', 'ion_number', 'level_number_upper'])
+
+count_down = lines_data_level_number_upper_meta['line_id'].count()
 levels_data['metastable'] = count_down == 0
 levels_data['metastable'] = pd.isnull(levels_data['metastable'])
+
 
 #culling autoionizing
 levels_atom_ion_index = zip(levels_data.index.get_level_values('atomic_number'),
@@ -239,6 +244,9 @@ for index in levels_data.index:
     try:
         line_group = lines_data_level_number_upper.get_group(index)
     except KeyError:
+        if index[0] == index[1]:
+            print "Found special index %s" % (index,)
+            index_in_lines = True
         pass
     else:
         index_in_lines = True
@@ -246,6 +254,10 @@ for index in levels_data.index:
     try:
         line_group = lines_data_level_number_lower.get_group(index)
     except KeyError:
+        if index[0] == index[1]:
+            print "Found special index %s" % (index,)
+            index_in_lines = True
+
         pass
     else:
         index_in_lines = True
