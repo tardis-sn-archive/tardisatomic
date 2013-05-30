@@ -159,37 +159,32 @@ FROM
 def add_artificial_ionized_levels(conn):
     #Clean first
 
-    print "Adding fully ionized levels for H and He"
+    ionized_levels_stmt = "INSERT INTO levels (atom, ion, energy, g, metastable, level_id, source) " \
+                          "values(?, ?, ?, ?, ?, ?, ?)"
+
+
     clean_fully_ionized_stmt = "DELETE FROM levels WHERE atom == ion "
 
     conn.execute(clean_fully_ionized_stmt)
 
     ionization_data = fileio.read_nist_ionization_data(full_information=True)
-    for atomic_number, ion_number, level_g, energy in ionization_data[['atomic_number', 'ion_number', 'ground_level_j',
+    for atomic_number, ion_number, level_g, energy in ionization_data[['atomic_number', 'ion_number', 'ground_level_g',
                                                                       'energy']]:
+        atomic_number = int(atomic_number)
+        ion_number = int(ion_number) - 1
+        if ion_number + 1 == atomic_number:
+            print "Adding fully ionized for atom %d" % atomic_number
+            conn.execute(ionized_levels_stmt, (atomic_number, atomic_number, 0.0, 1.0, True, 0,
+                                               'tardis_artificial_fully_ionized'))
 
-        no_levels = conn.execute('select count(atom) from levels where atom=? and ion=?', (atomic_number, ion_number-1))\
+        no_levels = conn.execute('select count(atom) from levels where atom=? and ion=?', (atomic_number, ion_number))\
                                 .fetchone()[0]
         if no_levels > 0:
             continue
+        print "Atom %d Ion %d has 0 levels adding artifical level" % (atomic_number, ion_number)
+        conn.execute(ionized_levels_stmt, (atomic_number, ion_number, 0.0, level_g, True, 0,
+                                           'tardis_artifical_missing_ion'))
 
-        print "a %d i %d has 0 levels" % (atomic_number, ion_number - 1)
-    return
-
-
-    add_full_ionized_levels_stmt ="""
-INSERT INTO
-    levels (atom,ion,energy,g,metastable,level_id)
-    SELECT DISTINCT
-        atom,atom,0,1,1,0
-    FROM
-        levels
-    WHERE NOT EXISTS
-        (SELECT 1 FROM levels WHERE atom == ion)
-    AND
-        atom in (1, 2)
-    """
-    conn.execute(add_full_ionized_levels_stmt)
     conn.commit()
 
 
