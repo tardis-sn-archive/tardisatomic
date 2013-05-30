@@ -240,15 +240,21 @@ levels_data = levels_data[~auto_ionizing_levels_mask]
 
 print "cleaning levels which don't exist in lines"
 existing_levels_ids = []
-for index in levels_data.index:
+for idx, line in levels_data.reset_index().iterrows():
     index_in_lines = False
+    index = line['atomic_number'], line['ion_number'], line['level_number']
+
     try:
         line_group = lines_data_level_number_upper.get_group(index)
     except KeyError:
         if index[0] == index[1]:
-            print "Found special index %s" % (index,)
+            print "Found fully ionized %s" % (index,)
             index_in_lines = True
-        pass
+        elif line['source'].startswith('tardis_artifical'):
+            print "Found artifical ion level %s" % (index, )
+            index_in_lines = True
+        else:
+            pass
     else:
         index_in_lines = True
 
@@ -256,9 +262,13 @@ for index in levels_data.index:
         line_group = lines_data_level_number_lower.get_group(index)
     except KeyError:
         if index[0] == index[1]:
-            print "Found special index %s" % (index,)
+            print "Found fully ionized %s" % (index,)
             index_in_lines = True
-
+        elif line['source'].startswith('tardis_artifical'):
+            print "Found artifical ion level %s" % (index, )
+            index_in_lines = True
+        else:
+            pass
         pass
     else:
         index_in_lines = True

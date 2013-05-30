@@ -65,7 +65,7 @@ for species in args.species:
 
         print "Inserting %s %s to database" % (symbol, ion_number)
         import_chianti.insert_to_db(symbol, ion_number, conn)
-        construct_atom_db.add_fully_ionized_levels(conn)
+    construct_atom_db.add_artificial_ionized_levels(conn)
 
 
 
