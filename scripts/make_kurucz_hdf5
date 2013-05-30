@@ -119,6 +119,7 @@ if ion_filter_stmt != '':
 if atom_filter_stmt != '':
     where_stmt.append(atom_filter_stmt)
 
+where_stmt.append('wl>0')
 if where_stmt != []:
     lines_data_sql_stmt += ' where %s' % ' and '.join(where_stmt)
 
