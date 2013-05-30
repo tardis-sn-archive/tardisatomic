@@ -3,7 +3,7 @@ import sqlite3
 import math
 import numpy as np
 #import macro_atom_transition
-from tardisatomic import import_ionDB
+from tardisatomic import import_ionDB, fileio
 
 gfall_db = os.path.join(os.path.dirname(__file__), 'data', 'gfall.db3')
 zeta_datafile = os.path.join(os.path.dirname(__file__), 'data', 'knox_long_recombination_zeta.dat')
@@ -156,11 +156,26 @@ FROM
     ORDER BY atom, ion, energy
     """
 
-def add_fully_ionized_levels(conn):
+def add_artificial_ionized_levels(conn):
     #Clean first
+
     print "Adding fully ionized levels for H and He"
     clean_fully_ionized_stmt = "DELETE FROM levels WHERE atom == ion "
+
     conn.execute(clean_fully_ionized_stmt)
+
+    ionization_data = fileio.read_nist_ionization_data(full_information=True)
+    for atomic_number, ion_number, level_g, energy in ionization_data[['atomic_number', 'ion_number', 'ground_level_j',
+                                                                      'energy']]:
+
+        no_levels = conn.execute('select count(atom) from levels where atom=? and ion=?', (atomic_number, ion_number-1))\
+                                .fetchone()[0]
+        if no_levels > 0:
+            continue
+
+        print "a %d i %d has 0 levels" % (atomic_number, ion_number - 1)
+    return
+
 
     add_full_ionized_levels_stmt ="""
 INSERT INTO
@@ -199,7 +214,7 @@ def create_levels(conn):
         conn.execute('insert into levels(atom, ion, energy, g, label, level_id, source) values(?, ?, ?, ?, ?, ?, "kurucz")', (atom, ion, energy, g , label, i))
     conn.execute('create index level_unique_idx on levels(atom, ion, energy, g, label)')
     conn.execute('create index level_global_idx on levels(id)')
-    print('Creating fully ionized levels')
+
     return conn
 
 def link_levels(conn):
