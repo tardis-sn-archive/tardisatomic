@@ -3,10 +3,17 @@ import sqlite3
 import math
 import numpy as np
 #import macro_atom_transition
-from tardisatomic import import_ionDB, fileio
-
+from tardisatomic import import_ionDB, fileio, util
+from astropy import constants
 gfall_db = os.path.join(os.path.dirname(__file__), 'data', 'gfall.db3')
 zeta_datafile = os.path.join(os.path.dirname(__file__), 'data', 'knox_long_recombination_zeta.dat')
+
+
+def convert_air2vacuum(wavelength):
+    if wavelength > 2000.:
+        return util.convert_air_to_vacuum(wavelength)
+    else:
+        return wavelength
 
 try:
     import sqlparse
@@ -17,12 +24,12 @@ except ImportError:
 
 #constants
 
-hc = 4.135667516e-15 * 2.99792458e10 # 2 ev
+hc = (constants.h * constants.c).to('eV cm').value
 
 
 linelist_select_stmt = """
 SELECT
-    10*wl,
+    convert_air2vacuum(10*wl),
     loggf,
     elem AS atom,
     ion,
@@ -88,6 +95,7 @@ def new_linelist_from_gfall(new_dbname, gfall_fname=None, select_atom=None):
     print "Reading lines from Kurucz gfall"
     conn = sqlite3.connect(new_dbname)
     conn.create_function('pow', 2, math.pow)
+    conn.create_function('convert_air2vacuum', 1, convert_air2vacuum)
     if gfall_fname is None:
         gfall_fname = gfall_db
     #attaching gfall database
