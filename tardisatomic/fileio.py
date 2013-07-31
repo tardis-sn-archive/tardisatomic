@@ -175,5 +175,6 @@ def read_nist_ionization_data(fname=default_nist_ionization_data, full_informati
     else:
         del ionization_data['ground_level_g']
         del ionization_data['ground_level_j']
+        ionization_data.columns = ['atomic_number', 'ion_number', 'ionization_energy']
         return ionization_data.to_records(index=False)
 

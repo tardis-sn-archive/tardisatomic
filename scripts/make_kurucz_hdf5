@@ -282,7 +282,8 @@ for idx, line in levels_data.reset_index().iterrows():
 print "Found %d levels which don't exist in lines (total=%d levels)" % (len(levels_data)-len(existing_levels_ids), len(levels_data))
 levels_data = levels_data.ix[existing_levels_ids]
 levels_prev_index = pd.Series(index=levels_data.index.copy())
-levels_data.reset_index(inplace=True).set_index(['atomic_number', 'ion_number'], inplace=True)
+levels_data.reset_index(inplace=True)
+levels_data.set_index(['atomic_number', 'ion_number'], inplace=True)
 
 print "Relabeling index numbers"
 
