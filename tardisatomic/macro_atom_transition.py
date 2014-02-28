@@ -1,6 +1,6 @@
-
 import numpy as np
 import sqlite3
+
 f2A_coefficient = (2 * np.pi * constants.e**2) / (constants.me * constants.c)
 f2B_coefficient = (np.pi * constants.e**2) / (constants.me * constants.c)
 

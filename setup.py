@@ -21,7 +21,7 @@ from astropy.setup_helpers import (register_commands, adjust_compiler,
 from astropy.version_helpers import get_git_devstr, generate_version_py
 
 # Set affiliated package-specific settings
-PACKAGENAME = 'packagename'
+PACKAGENAME = 'tardisatomic'
 DESCRIPTION = 'Astropy affiliated package'
 LONG_DESCRIPTION = ''
 AUTHOR = ''
