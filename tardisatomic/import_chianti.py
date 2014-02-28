@@ -53,8 +53,8 @@ def read_chianti(symbol, ion_number, level_observed=True, temperatures = np.lins
     lines_data['f_ul'] = lines_data['A_ul'] / A_coeff
     lines_data['f_lu'] = (lines_data['A_ul'] * g_upper) / (A_coeff * g_lower)
     lines_data['loggf'] = np.log10(lines_data['f_lu'] * g_lower)
-    lines_data['wavelength'] = lines_data['wavelength'] / (1.0 + 2.735182E-4 + 131.4182 / lines_data['wavelength']**2
-                                                           + 2.76249E8 / lines_data['wavelength']**4)
+    lines_data['wavelength'] = lines_data['wavelength']# / (1.0 + 2.735182E-4 + 131.4182 / lines_data['wavelength']**2
+                                                       #   + 2.76249E8 / lines_data['wavelength']**4)
 
     lines_data = lines_data[lines_data['level_number_upper'] <= last_bound_level]
     collision_data_index = pd.MultiIndex.from_arrays((ion_data.Splups['lvl1'], ion_data.Splups['lvl2']))
