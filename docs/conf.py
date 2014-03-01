@@ -56,10 +56,11 @@ copyright = u'2013, ' + author
 
 import tardisatomic
 # The short X.Y version.
-version = tardisatomic.__version__.split('-', 1)[0]
+version = 'dev'
+#tardisatomic.__version__.split('-', 1)[0]
 # The full version, including alpha/beta/rc tags.
-release = tardisatomic.__version__
-
+#release = tardisatomic.__version__
+release = 'dev'
 
 # -- Options for HTML output ---------------------------------------------------
 
