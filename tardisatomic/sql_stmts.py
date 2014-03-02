@@ -2,7 +2,7 @@ __author__ = 'wkerzend'
 
 linelist_select_stmt = """
 SELECT
-    10*wavelength,
+    convert_air2vacuum(10*wavelength),
     loggf,
     atomic_number,
     ion_number,
@@ -11,18 +11,16 @@ SELECT
     label_upper,
     e_lower * %(hc).20f,
     cast(2*j_lower + 1 AS integer) AS g_lower,
-    label_lower
+    label_lower,
+    "kurucz"
 FROM
-    gfall
-
-WHERE
-    loggf > %(loggf_thresh).2f
-    %(where_stmt)s
+    kurucz_lines.gfall
 """
+
 
 linelist_insert_stmt = """
 insert into
-    main.lines(wl,
+    main.lines(wavelength,
         loggf,
         atom,
         ion,
@@ -31,14 +29,15 @@ insert into
         label_upper,
         e_lower,
         g_lower,
-        label_lower)"""
+        label_lower,
+        source)"""
 
 
 linelist_create_stmt = """
 CREATE TABLE
     main.lines(
     id integer primary key,
-    wl float,
+    wavelength float,
     loggf float,
     atom integer,
     ion integer,
@@ -53,7 +52,8 @@ CREATE TABLE
     label_lower text,
     level_id_lower integer default -1,
     global_level_id_lower integer default -1,
-    f_lu float)
+    f_lu float,
+    source text)
     """
 
 update_oscillator_stmt = """

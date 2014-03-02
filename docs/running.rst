@@ -16,4 +16,4 @@ its sqlite form `gfall.db3`::
 The next step is to convert the `gfall.db3` to a real atomic database (with levels and lines and links between them). This is
 done by `make_kurucz_db`::
 
-
+    python tardisatomic/scripts/make_kurucz_db kurucz.db3 gfall.db3

@@ -8,7 +8,7 @@ parser.add_argument('dbname')
 parser.add_argument('gfall',help='Specify which gfall database the script should use.')
 args = parser.parse_args()
 
-if os.exists(args.dbname):
+if os.path.exists(args.dbname):
     if raw_input('{0} does exist. Overwrite [y/N]'.format(args.dbname)).lower().strip() == 'y':
         os.system('rm {0}'.format(args.dbname))
     else:

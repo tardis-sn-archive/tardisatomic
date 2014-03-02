@@ -3,7 +3,7 @@ import sqlite3
 import math
 import numpy as np
 #import macro_atom_transition
-from tardisatomic import import_ionDB, fileio, util
+from tardisatomic import import_ionDB, fileio, util, sql_stmts
 from astropy import constants
 gfall_db = os.path.join(os.path.dirname(__file__), 'data', 'gfall.db3')
 zeta_datafile = os.path.join(os.path.dirname(__file__), 'data', 'knox_long_recombination_zeta.dat')
@@ -26,62 +26,6 @@ except ImportError:
 
 hc = (constants.h * constants.c).to('eV cm').value
 
-
-linelist_select_stmt = """
-SELECT
-    convert_air2vacuum(10*wl),
-    loggf,
-    elem AS atom,
-    ion,
-    e_upper * %(hc).20f,
-    cast(2*j_upper + 1 AS integer) AS g_upper,
-    label_upper,
-    e_lower * %(hc).20f,
-    cast(2*j_lower + 1 AS integer) AS g_lower,
-    label_lower,
-    "kurucz"
-FROM
-    kurucz_lines.gfall
-"""
-
-linelist_insert_stmt = """
-insert into
-    main.lines(wl,
-        loggf,
-        atom,
-        ion,
-        e_upper,
-        g_upper,
-        label_upper,
-        e_lower,
-        g_lower,
-        label_lower,
-        source)"""
-        
-        
-linelist_create_stmt = """
-CREATE TABLE
-    main.lines(
-    id integer primary key,
-    wl float,
-    loggf float,
-    atom integer,
-    ion integer,
-    e_upper float,
-    g_upper integer,
-    label_upper text,
-    level_id_upper integer default -1,
-    global_level_id_upper integer default -1,
-    f_ul float,
-    e_lower float,
-    g_lower integer,
-    label_lower text,
-    level_id_lower integer default -1,
-    global_level_id_lower integer default -1,
-    f_lu float,
-    source text)
-    """
-
 update_oscillator_stmt = """
 UPDATE
     lines
@@ -102,12 +46,12 @@ def new_linelist_from_gfall(new_dbname, gfall_fname=None, select_atom=None):
     conn.execute("attach '%s' as kurucz_lines" % gfall_fname)
     curs = conn.cursor()
     curs.execute('drop table if exists lines')
-    curs.execute(linelist_create_stmt)
+    curs.execute(sql_stmts.linelist_create_stmt)
     if select_atom is None:
         elem_select_stmt = ""
     else:
         elem_select_stmt = " and elem in (%s)" % (','.join(map(str, select_atom)),)
-    insert_fromgfall_stmt = linelist_insert_stmt + linelist_select_stmt % {'hc':hc, 'where_stmt':elem_select_stmt}
+    insert_fromgfall_stmt = sql_stmts.linelist_insert_stmt + sql_stmts.linelist_select_stmt % {'hc':hc, 'where_stmt':elem_select_stmt}
     
     if sqlparse_available:
         print sqlparse.format(insert_fromgfall_stmt, reindent=True)
