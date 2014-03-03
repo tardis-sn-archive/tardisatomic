@@ -39,6 +39,10 @@ if args.output_db is None:
         sys.exit(0)
     conn = sqlite3.connect(args.input_db)
 else:
+    if os.path.exists(args.output_db):
+        if not raw_input('{0} exists. Delete and continue [y/N]').strip().lower().startswith('y'):
+            sys.exit(1)
+
     os.system('cp %s %s' % (args.input_db, args.output_db))
     conn = sqlite3.connect(args.output_db)
 
@@ -54,7 +58,7 @@ for species in args.species:
 
     atomic_number, ion_number = util.species_string_to_tuple(species)
     element_symbol = util.atomic_number2element_symbol(atomic_number)
-    print "Inserting %s %s to database" % (element_symbol, ion_number)
+    print "Inserting %s %s to database" % (element_symbol, ion_number+1)
     import_chianti.insert_to_db(element_symbol, ion_number, conn)
 
     construct_atom_db.add_artificial_ionized_levels(conn)
