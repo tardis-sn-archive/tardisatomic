@@ -161,8 +161,8 @@ def insert_to_db(symbol, ion_number, conn, temperatures=None):
     curs = conn.cursor()
 
 
-    curs.execute('delete from levels where atom=? and ion=?', (atomic_number, ion_number - 1))
-    curs.execute('delete from lines where atom=? and ion=?', (atomic_number, ion_number - 1))
+    curs.execute('delete from levels where atom=? and ion=?', (atomic_number, ion_number))
+    curs.execute('delete from lines where atom=? and ion=?', (atomic_number, ion_number))
 
 
     collision_data_cols = curs.execute('pragma table_info(collision_data)').fetchall()
@@ -183,17 +183,17 @@ def insert_to_db(symbol, ion_number, conn, temperatures=None):
     for key, line in lines_data.iterrows():
         curs.execute('insert into lines(wavelength, atom, ion, level_id_upper, level_id_lower, f_lu, f_ul, loggf, source) '
                      'values(?, ?, ?, ?, ?, ?, ?, ?, "chianti")',
-                     (line['wavelength'], atomic_number, ion_number-1,
+                     (line['wavelength'], atomic_number, ion_number,
                       line['level_number_upper']-1, line['level_number_lower']-1,
                       line['f_lu'], line['f_ul'], line['loggf']))
 
 
     for key, level in levels_data.iterrows():
         count_down = curs.execute('select count(id) from lines where atom=? and ion=? and level_id_upper=?',
-                     (atomic_number, ion_number-1, int(key-1))).fetchone()[0]
+                     (atomic_number, ion_number, int(key-1))).fetchone()[0]
 
         curs.execute('insert into levels(atom, ion, energy, g, level_id, metastable, source) values(?, ?, ?, ?, ?, ?, "chianti")',
-                     (atomic_number, ion_number-1, level['energy'], level['g'], int(key-1), count_down == 0))
+                     (atomic_number, ion_number, level['energy'], level['g'], int(key-1), count_down == 0))
 
 
 
@@ -209,7 +209,7 @@ def insert_to_db(symbol, ion_number, conn, temperatures=None):
         level_number_lower = int(collision_data['level_number_lower'] - 1)
         level_number_upper = int(collision_data['level_number_upper'] - 1)
 
-        collision_line_data = ["chianti", atomic_number, ion_number-1, level_number_lower, level_number_upper] + c_ul + [g_ratio, delta_e]
+        collision_line_data = ["chianti", atomic_number, ion_number, level_number_lower, level_number_upper] + c_ul + [g_ratio, delta_e]
 
 
         curs.execute(insert_stmt, collision_line_data)

@@ -107,7 +107,7 @@ try:
 except sqlite3.OperationalError as e:
     print e
 
-lines_data_sql_stmt = ('select id, wl, atom, ion, f_ul, f_lu, loggf, level_id_lower, level_id_upper, source from lines')
+lines_data_sql_stmt = ('select id, wavelength, atom, ion, f_ul, f_lu, loggf, level_id_lower, level_id_upper, source from lines')
 #lines_data_sql_stmt += 'where  loggf > %s ' % args.loggf_threshold
 
 
@@ -119,11 +119,11 @@ if ion_filter_stmt != '':
 if atom_filter_stmt != '':
     where_stmt.append(atom_filter_stmt)
 
-where_stmt.append('wl>0')
+where_stmt.append('wavelength>0')
 if where_stmt != []:
     lines_data_sql_stmt += ' where %s' % ' and '.join(where_stmt)
 
-lines_data_sql_stmt += ' order by wl'
+lines_data_sql_stmt += ' order by wavelength'
 
 
 print lines_data_sql_stmt
@@ -248,10 +248,10 @@ for idx, line in levels_data.reset_index().iterrows():
         line_group = lines_data_level_number_upper.get_group(index)
     except KeyError:
         if index[0] == index[1]:
-            print "Found fully ionized %s" % (index,)
+            #print "Found fully ionized %s" % (index,)
             index_in_lines = True
         elif line['source'].startswith('tardis_artifical'):
-            print "Found artifical ion level %s" % (index, )
+            #print "Found artifical ion level %s" % (index, )
             index_in_lines = True
         else:
             pass
@@ -262,10 +262,10 @@ for idx, line in levels_data.reset_index().iterrows():
         line_group = lines_data_level_number_lower.get_group(index)
     except KeyError:
         if index[0] == index[1]:
-            print "Found fully ionized %s" % (index,)
+            #print "Found fully ionized %s" % (index,)
             index_in_lines = True
         elif line['source'].startswith('tardis_artifical'):
-            print "Found artifical ion level %s" % (index, )
+            #print "Found artifical ion level %s" % (index, )
             index_in_lines = True
         else:
             pass
@@ -289,7 +289,7 @@ print "Relabeling index numbers"
 
 for index in np.unique(levels_data.index.values):
     levels_prev_index.ix[index] = np.arange(levels_data.ix[index].level_number.count())
-    levels_data.ix[index].level_number = np.arange(levels_data.ix[index].level_number.count())
+    levels_data.loc[index, 'level_number'] = np.arange(levels_data.ix[index].level_number.count())
 
 
 lines_data_level_number_upper = lines_data.set_index(['atomic_number', 'ion_number', 'level_number_upper'])
@@ -315,7 +315,7 @@ lines_data_level_number_lower = lines_data_level_number_lower.groupby(level=['at
 
 lines_data = lines_data.set_index('line_id')
 levels_data = levels_data.reset_index().set_index(['atomic_number', 'ion_number', 'level_number'])
-
+1/0
 del lines_data['loggf']
 del lines_data['source']
 del levels_data['source']
