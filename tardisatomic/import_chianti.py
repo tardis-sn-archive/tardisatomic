@@ -16,7 +16,7 @@ basic_atom_data = h5py.File(os.path.join(os.path.dirname(__file__), 'data', 'ato
 symbol2z = dict(zip(basic_atom_data['symbol'], basic_atom_data['atomic_number']))
 
 def read_chianti(symbol, ion_number, level_observed=True, temperatures = np.linspace(2000, 50000, 20)):
-    ion_data = ch.ion('%s_%d' % (symbol.lower(), ion_number))
+    ion_data = ch.ion('{0}_{1:d}'.format(symbol.lower(), ion_number+1))
     levels_data = {}
     levels_data['level_number'] = ion_data.Elvlc['lvl']
 
@@ -181,7 +181,7 @@ def insert_to_db(symbol, ion_number, conn, temperatures=None):
     levels_data, lines_data, collision_data = read_chianti(symbol, ion_number, temperatures=temperatures_data)
 
     for key, line in lines_data.iterrows():
-        curs.execute('insert into lines(wl, atom, ion, level_id_upper, level_id_lower, f_lu, f_ul, loggf, source) '
+        curs.execute('insert into lines(wavelength, atom, ion, level_id_upper, level_id_lower, f_lu, f_ul, loggf, source) '
                      'values(?, ?, ?, ?, ?, ?, ?, ?, "chianti")',
                      (line['wavelength'], atomic_number, ion_number-1,
                       line['level_number_upper']-1, line['level_number_lower']-1,

@@ -10,7 +10,7 @@ import sqlite3
 import re
 from tardisatomic import import_chianti, construct_atom_db
 
-
+from tardis import util
 try:
     import sqlparse
     sqlparse_available = True
@@ -52,19 +52,11 @@ print "inserting CHIANTI data"
 
 for species in args.species:
 
-    species_pattern = re.compile('^(.+)(\d+)$')
-    species_match = species_pattern.match(species)
+    atomic_number, ion_number = util.species_string_to_tuple(species)
+    element_symbol = util.atomic_number2element_symbol(atomic_number)
+    print "Inserting %s %s to database" % (element_symbol, ion_number)
+    import_chianti.insert_to_db(element_symbol, ion_number, conn)
 
-    if species_match is None:
-        raise ValueError("Could not match %s to a known species (like 'Ca2')" % species)
-    else:
-        symbol, ion_number = species_match.groups()
-        ion_number = int(ion_number)
-        if symbol not in symbol2z.keys():
-            raise ValueError("Requested atom %s not in database" % symbol)
-
-        print "Inserting %s %s to database" % (symbol, ion_number)
-        import_chianti.insert_to_db(symbol, ion_number, conn)
     construct_atom_db.add_artificial_ionized_levels(conn)
 
 
