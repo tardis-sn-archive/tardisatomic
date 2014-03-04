@@ -4,6 +4,7 @@ import os
 
 import pandas as pd
 from tardis import atomic
+import urlparse
 
 def chunks(l, n):
     """ Yield successive n-sized chunks from l.
@@ -44,7 +45,8 @@ def create_atom_data_table_from_file(file_pattern, base_url=''):
 
     for fname in glob(file_pattern):
         atom_data = atomic.AtomData.from_hdf5(fname)
-        atom_data_table['file name'].append(os.path.basename(fname))
+        base_fname = os.path.basename(fname)
+        atom_data_table['file name'].append('`{0} <{1}>`_'.format(base_fname, urlparse.urljoin(base_url, base_fname)))
         atom_data_table['url'].append('')
         atom_data_table['uuid1'].append(atom_data.uuid1)
         atom_data_table['data sources'].append(create_data_sources_overview(atom_data.data_sources))
