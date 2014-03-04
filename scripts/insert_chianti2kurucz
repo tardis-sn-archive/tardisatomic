@@ -40,7 +40,7 @@ if args.output_db is None:
     conn = sqlite3.connect(args.input_db)
 else:
     if os.path.exists(args.output_db):
-        if not raw_input('{0} exists. Delete and continue [y/N]').strip().lower().startswith('y'):
+        if not raw_input('{0} exists. Delete and continue [y/N]'.format(args.output_db)).strip().lower().startswith('y'):
             sys.exit(1)
 
     os.system('cp %s %s' % (args.input_db, args.output_db))

@@ -17,6 +17,8 @@ from collections import OrderedDict
 
 import hashlib
 import uuid
+import itertools
+
 
 import pdb
 
@@ -92,6 +94,22 @@ if os.path.exists(args.hdf5):
 os.system('cp %s %s' % (basic_atom_data_fname, args.hdf5))
 hdf5_file = h5py.File(args.hdf5)
 ######################################################
+
+
+def create_species_content_for_source(levels_data, source_label='kurucz'):
+    """
+    Generate species content for source_label (i.e. kurucz: Si I - Si X)
+
+    Parameters
+    ----------
+
+    levels_data: ~pd.DataFrame
+
+    """
+
+    for key, group in itertools.groupby(levels_data.iterrows(), key=lambda line: line[1]['source']):
+        if key not in ('tardis_artificial_fully_ionized'):
+            continue
 
 
 ionization_data = pd.DataFrame(hdf5_file['ionization_data'].__array__())
@@ -250,7 +268,7 @@ for idx, line in levels_data.reset_index().iterrows():
         if index[0] == index[1]:
             #print "Found fully ionized %s" % (index,)
             index_in_lines = True
-        elif line['source'].startswith('tardis_artifical'):
+        elif line['source'].startswith('tardis_artificial'):
             #print "Found artifical ion level %s" % (index, )
             index_in_lines = True
         else:
@@ -264,7 +282,7 @@ for idx, line in levels_data.reset_index().iterrows():
         if index[0] == index[1]:
             #print "Found fully ionized %s" % (index,)
             index_in_lines = True
-        elif line['source'].startswith('tardis_artifical'):
+        elif line['source'].startswith('tardis_artificial'):
             #print "Found artifical ion level %s" % (index, )
             index_in_lines = True
         else:
