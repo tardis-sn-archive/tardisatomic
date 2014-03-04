@@ -38,19 +38,21 @@ def create_data_sources_overview(data_sources_dict):
     return data_source_string
 
 def create_atom_data_table_from_file(file_pattern, base_url=''):
+    column_names = ['file name', 'uuid1', 'data sources', 'macroatom', 'zeta', 'synpp references', 'database version']
 
-    atom_data_table = {'file name':[], 'url':[], 'md5':[], 'uuid1':[], 'data sources':[], 'database version':[]}
+    atom_data_table = {item:[] for item in column_names}
 
     for fname in glob(file_pattern):
         atom_data = atomic.AtomData.from_hdf5(fname)
         atom_data_table['file name'].append(os.path.basename(fname))
         atom_data_table['url'].append('')
-        atom_data_table['md5'].append(atom_data.md5)
         atom_data_table['uuid1'].append(atom_data.uuid1)
         atom_data_table['data sources'].append(create_data_sources_overview(atom_data.data_sources))
         atom_data_table['database version'].append(atom_data.version)
+        atom_data_table['macroatom'].append(atom_data.has_macro_atom)
+        atom_data_table['zeta'].append(atom_data.has_zeta_data)
+        atom_data_table['synpp references'].append(atom_data.has_synpp_refs)
 
-    return pd.DataFrame(atom_data_table, columns=['file name', 'url', 'md5', 'uuid1', 'data sources', 'database version'])
 
-
+    return pd.DataFrame(atom_data_table, columns=column_names)
 
