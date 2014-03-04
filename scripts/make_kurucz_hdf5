@@ -8,8 +8,10 @@ import os
 import sys
 import pandas as pd
 
+
 from astropy import units, constants, table
 
+import cPickle as pickle
 from tardisatomic import sql_stmts
 import numpy as np
 import sqlite3
@@ -19,8 +21,7 @@ import hashlib
 import uuid
 import itertools
 
-
-import pdb
+from tardis import util
 
 try:
     import sqlparse
@@ -107,9 +108,26 @@ def create_species_content_for_source(levels_data, source_label='kurucz'):
 
     """
 
-    for key, group in itertools.groupby(levels_data.iterrows(), key=lambda line: line[1]['source']):
-        if key not in ('tardis_artificial_fully_ionized'):
+    culled_levels_data = levels_data[(levels_data.index.get_level_values('level_number') == 0)]
+    included_species = []
+    for key, group in itertools.groupby(culled_levels_data.iterrows(), key=lambda line: line[1]['source']):
+
+        if key != source_label:
             continue
+        list_group = list(group)
+
+        if len(list_group) == 1:
+            included_species.append(util.species_tuple_to_string(list_group[0][0][:2]))
+        else:
+            species_range_string = '{0} {1}-{2}'.format(util.atomic_number2element_symbol(list_group[0][0][0]),
+                                                        util.int_to_roman(list_group[0][0][1]+1),
+                                                        util.int_to_roman(list_group[-1][0][1]+1))
+            included_species.append(species_range_string)
+
+
+    return included_species
+
+
 
 
 ionization_data = pd.DataFrame(hdf5_file['ionization_data'].__array__())
@@ -333,7 +351,17 @@ lines_data_level_number_lower = lines_data_level_number_lower.groupby(level=['at
 
 lines_data = lines_data.set_index('line_id')
 levels_data = levels_data.reset_index().set_index(['atomic_number', 'ion_number', 'level_number'])
-1/0
+
+unique_sources = [item for item in levels_data['source'].unique() if item != 'tardis_artificial_fully_ionized']
+source_dict = {}
+
+for source in unique_sources:
+    source_dict[source] = create_species_content_for_source(levels_data, source_label=source)
+
+
+hdf5_file.attrs['data_sources'] = pickle.dumps(source_dict)
+
+
 del lines_data['loggf']
 del lines_data['source']
 del levels_data['source']
@@ -494,8 +522,7 @@ if args.include_ion_cx:
 
 
 
-
-
+hdf5_file.attrs['database_version'] = 'v0.9'
 
 print "Signing Atom_data with MD5 and UUID1"
 
