@@ -25,7 +25,7 @@ Inserting Chianti into the database
 To use this one needs to have `chiantipy` installed `<http://chiantipy.sourceforge.net/>`_. Then one can add CHIANTI atomic
 data to the database. For example::
 
-    python insert_chianti2kurucz kurucz.db3 Si2 S2 Mg2 Ca2 He2 H1 -o kurucz_atom_chianti_many.db3
+    python <path to tardisatomic>/scripts/insert_chianti2kurucz kurucz.db3 Si2 S2 Mg2 Ca2 He2 H1 -o kurucz_atom_chianti_many.db3
 
 
 Building the HDF5 Database
