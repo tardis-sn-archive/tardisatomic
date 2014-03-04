@@ -133,9 +133,9 @@ def add_artificial_ionized_levels(conn):
                                 .fetchone()[0]
         if no_levels > 0:
             continue
-        print "Atom %d Ion %d has 0 levels adding artifical level" % (atomic_number, ion_number)
+        print "Atom %d Ion %d has 0 levels adding artificial level" % (atomic_number, ion_number)
         conn.execute(ionized_levels_stmt, (atomic_number, ion_number, 0.0, level_g, True, 0,
-                                           'tardis_artifical_missing_ion'))
+                                           'tardis_artificial_missing_ion'))
 
     conn.commit()
 
