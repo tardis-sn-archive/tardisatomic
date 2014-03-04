@@ -33,6 +33,9 @@ def create_data_sources_overview(data_sources_dict):
     data_source_string = ''
     data_source_template = '**{0}:**\n\n'
     for data_source in ['kurucz', 'chianti', 'tardis_artificial_missing_ion']:
+        if data_source not in data_sources_dict:
+            continue
+
         data_source_string += data_source_template.format(data_source) + \
                               species_include_list2string(data_sources_dict[data_source]) + '\n\n'
 
