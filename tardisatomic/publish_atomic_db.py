@@ -6,6 +6,8 @@ import pandas as pd
 from tardis import atomic
 import urlparse
 
+from tardisatomic import util
+
 def chunks(l, n):
     """ Yield successive n-sized chunks from l.
     """
@@ -28,7 +30,10 @@ def species_include_list2string(species_include_list, max_char=20):
             current_line_list = []
             line_char_count = 0
 
+    species_strings.append(','.join(current_line_list))
     return '\n'.join(species_strings)
+
+
 def create_data_sources_overview(data_sources_dict):
     data_source_string = ''
     data_source_template = '**{0}:**\n\n'
@@ -41,14 +46,32 @@ def create_data_sources_overview(data_sources_dict):
 
     return data_source_string
 
-def create_atom_data_table_from_file(file_pattern, base_url=''):
+def publish_atom_data_sets(file_pattern,
+                           base_url='http://moria.astro.utoronto.ca/~wkerzend/tardis_atomic_databases/',
+                           default_atomic_database='kurucz_cd23_full',
+                           table_fname='current_public_table.rst',
+                           publish_directory='published'):
+
+
     column_names = ['file name', 'uuid1', 'data sources', 'macroatom', 'zeta', 'synpp references', 'database version']
 
-    atom_data_table = {item:[] for item in column_names}
+    if os.path.exists(publish_directory):
+        if raw_input('directory for publishing exists ({0}). Okay to overwrite [y/N]'.format(publish_directory)).strip().lower() == 'y':
+            os.system('rm -r {0}'.format(publish_directory))
+        else:
+            print "Aborting!"
+            return
+    os.system('mkdir {0}'.format(publish_directory))
 
+    atom_data_table = {item:[] for item in column_names}
+    index = []
     for fname in glob(file_pattern):
         atom_data = atomic.AtomData.from_hdf5(fname)
-        base_fname = os.path.basename(fname)
+        base_fname = os.path.basename(fname).replace('.h5', '.zip')
+        os.system('cp {src} {dest}; zip {basename} {dest}'.format(src=fname, dest=os.path.basename(fname),
+                                                                  basename=os.path.join(publish_directory, base_fname)))
+
+        index.append(base_fname.replace('.zip', ''))
         atom_data_table['file name'].append('`{0} <{1}>`_'.format(base_fname, urlparse.urljoin(base_url, base_fname)))
         atom_data_table['uuid1'].append(atom_data.uuid1)
         atom_data_table['data sources'].append(create_data_sources_overview(atom_data.data_sources))
@@ -58,5 +81,15 @@ def create_atom_data_table_from_file(file_pattern, base_url=''):
         atom_data_table['synpp references'].append(atom_data.has_synpp_refs)
 
 
-    return pd.DataFrame(atom_data_table, columns=column_names)
+    dataset_table = pd.DataFrame(atom_data_table, columns=column_names, index=index)
+
+    index.remove(default_atomic_database)
+    index = [default_atomic_database] + index
+
+    dataset_table = dataset_table.ix[index]
+
+    open(table_fname, 'w').write(util.make_table([dataset_table.columns] + dataset_table.values.tolist()))
+
+
+
 

@@ -328,6 +328,7 @@ for index in np.unique(levels_data.index.values):
     levels_data.loc[index, 'level_number'] = np.arange(levels_data.ix[index].level_number.count())
 
 
+
 lines_data_level_number_upper = lines_data.set_index(['atomic_number', 'ion_number', 'level_number_upper'])
 lines_data_level_number_upper_index = lines_data_level_number_upper.index.copy()
 lines_data_level_number_upper = lines_data_level_number_upper.groupby(level=['atomic_number', 'ion_number', 'level_number_upper'])
@@ -501,7 +502,7 @@ if args.synpp_refs is not None:
         current_lines_data = lines_data[(lines_data['atomic_number']==atom) & (lines_data['ion_number'] == ion)]
         if current_lines_data.empty:
             raise ValueError('Fix incomplete linelist later')
-        synpp_line_ids.append(current_lines_data.index[np.argmin(np.abs(current_lines_data['wavelength'] - wl))])
+        synpp_line_ids.append(current_lines_data.index[np.argmin(np.abs((current_lines_data['wavelength'] - wl).values))])
 
     synpp_ref = np.array(zip(synpp_atom, synpp_ion, synpp_line, synpp_line_ids),
                          dtype=[('atomic_number', np.int64), ('ion_number', np.int64), ('wavelength', np.float64), ('line_id', np.int64)])
