@@ -93,7 +93,7 @@ def read_chianti(symbol, ion_number, level_observed=True, temperatures = np.lins
     collision_data['level_number_lower'] = c_lvl1
     collision_data['level_number_upper'] = c_lvl2
 
-
+    lines_data = lines_data[lines_data.wavelength>0]
 
     return levels_data, lines_data, collision_data
 

@@ -38,7 +38,7 @@ parser.add_argument('--metastable_loggf_threshold', default=-3., help='log(gf) t
 parser.add_argument('--include_zeta', action='store_true', default=False, help='include recombination coefficients (zeta)')
 parser.add_argument('--include_collision', action='store_true', default=False, help='include collision rates')
 parser.add_argument('--build_macro', action='store_true', default=False, help='build macro atom table into the file')
-parser.add_argument('--max_atomic_number', default=30, help=('Setting the maximum atomic number to be stored in the HDF5'
+parser.add_argument('--max_atomic_number', default=30, type=int, help=('Setting the maximum atomic number to be stored in the HDF5'
             'file. For now 30 is the limit as I don\'t have reliable ionization data for anything above.'))
 parser.add_argument('--synpp_refs', help='point to the synpp_refs.dat')
 parser.add_argument('--include_ion_cx', action='store_true', default=False, help='include ionization cross sections (ion_cx)')
