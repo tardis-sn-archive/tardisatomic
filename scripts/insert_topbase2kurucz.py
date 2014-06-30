@@ -1,0 +1,75 @@
+#!/usr/bin/env python
+__author__ = 'michi'
+
+import tardisatomic
+import argparse
+import h5py
+import os
+import sys
+import sqlite3
+import re
+from tardisatomic import import_topbase, construct_atom_db
+
+
+try:
+    import sqlparse
+    sqlparse_available = True
+except ImportError:
+    sqlparse_available = False
+
+
+basic_atom_data = h5py.File(os.path.join(os.path.dirname(tardisatomic.__file__), 'data', 'atom_data_basic.h5'))['basic_atom_data']
+symbol2z = dict(zip(basic_atom_data['symbol'], basic_atom_data['atomic_number']))
+
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('input_db', help='HDF5 file that is created')
+parser.add_argument('species', nargs='+')
+parser.add_argument('-o', '--output_db', default=None, help='Output Database - if not set will overwrite input db')
+
+
+args = parser.parse_args()
+
+
+if args.output_db is None:
+    print """WARNING OVERWRITING CURRENT DATABASE - please specify an output db if this is not wished"""
+    continue_prompt = raw_input('Continue [y/N]')
+    if not continue_prompt.lower().startswith('y'):
+        sys.exit(0)
+    conn = sqlite3.connect(args.input_db)
+else:
+    os.system('cp %s %s' % (args.input_db, args.output_db))
+    conn = sqlite3.connect(args.output_db)
+
+
+curs = conn.cursor()
+#if curs.execute('pragma table_info(collision_data)').fetchall() == []:
+#    print "collision_data table does not exist - creating it"
+#    import_chianti.create_collision_data_table(conn)
+
+print "inserting TopBase data"
+
+species_list = []
+
+
+for species in args.species:
+
+    species_pattern = re.compile('^(.+)(\d+)$')
+    species_match = species_pattern.match(species)
+
+
+    if species_match is None:
+        raise ValueError("Could not match %s to a known species (like 'Ca2')" % species)
+    else:
+        symbol, ion_number = species_match.groups()
+        ion_number = int(ion_number)
+        if symbol not in symbol2z.keys():
+            raise ValueError("Requested atom %s not in database" % symbol)
+
+        species_list.append((symbol, ion_number))
+        print "Inserting %s %s to database" % (symbol, ion_number)
+
+
+import_topbase.insert_to_db(species_list,conn, 'fvalue.txt', 'level.txt', 'photocx.txt')
+construct_atom_db.add_fully_ionized_levels(conn)

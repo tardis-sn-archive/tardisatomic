@@ -6,7 +6,6 @@ import math
 
 import argparse
 import numpy as np
-np.seterr(all='raise')
 import h5py
 import os
 import sys
@@ -56,7 +55,7 @@ def analytic_cross_section(n,z,g):
 
 
     fineStructureConstant = (constants.e.gauss.value)**2/(constants.hbar.cgs.value * constants.c.cgs.value)
-    bohrRadius = constants.hbar.si.value / (constants.m_e.si.value * constants.c.si.value * fineStructureConstant)
+    bohrRadius = constants.hbar.cgs.value / (constants.m_e.cgs.value * constants.c.cgs.value * fineStructureConstant)
     sigam_edge = ((64 * math.pi * n * g)/(3 * math.sqrt(3)*np.power(z,2))) * fineStructureConstant * np.power(bohrRadius,2)
 
     return sigam_edge

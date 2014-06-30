@@ -1,8 +1,9 @@
-from tardis import constants
+#from tardis import constants
+from astropy import constants, units
 import numpy as np
 import sqlite3
-f2A_coefficient = (2 * np.pi * constants.e**2) / (constants.me * constants.c)
-f2B_coefficient = (np.pi * constants.e**2) / (constants.me * constants.c)
+f2A_coefficient = (2 * np.pi * constants.e.gauss.value**2) / (constants.m_e.cgs.value * constants.c.cgs.value)
+f2B_coefficient = (np.pi *constants.e.gauss.value **2) / (constants.m_e.cgs.value * constants.c.cgs.value)
 
 class group_concat_intarray(object):
     def __init__(self):
@@ -23,7 +24,7 @@ class calculate_p_internal_down(object):
         p_internal_down = (wl * 1e-8)**-2  * \
             f2A_coefficient * \
             (float(g_lower) / g_upper) * \
-            f_lu * (energy_lower / constants.erg2ev)
+            f_lu * (units.erg.to('eV', energy_lower))
         self.p_internals_down.append(p_internal_down)
     
     def finalize(self):
@@ -57,12 +58,13 @@ class calculate_p_emission_down(object):
         p_emission_down = (wl * 1e-8)**-2  * \
             f2A_coefficient * \
             (float(g_lower) / g_upper) * \
-            f_lu * (energy_delta / constants.erg2ev)
+            f_lu * (units.erg.to('eV',energy_delta))
         self.p_emissions_down.append(p_emission_down)
     
     def finalize(self):
-        return sqlite3.Binary(
-            np.array(self.p_emissions_down, dtype=np.float64).tostring()
-        )
+            return sqlite3.Binary(
+                    np.array(self.p_emissions_down, dtype=np.float64).tostring()
+                    )
+        
         #for testing purposes only        
         #return ','.join(map(str, self.p_emissions_down))

@@ -3,7 +3,10 @@ import sqlite3
 import math
 import numpy as np
 import macro_atom_transition
-from tardisatomic import import_ionDB
+from tardisatomic import import_ionDB, radiative_rates_cython
+import multiprocessing
+import itertools as iter
+import pickle
 
 gfall_db = os.path.join(os.path.dirname(__file__), 'data', 'gfall.db3')
 zeta_datafile = os.path.join(os.path.dirname(__file__), 'data', 'knox_long_recombination_zeta.dat')
@@ -469,6 +472,20 @@ def read_zeta(conn):
     conn.commit()
     return conn
 
+def create_T_grid(conn,Tstart=2000,Tend=50000,steps=2000):
+    print("Creating the T grid table.")
+    curs = conn.cursor()
+    t_grid_table_create = """CREATE TABLE T_grid(T INTEGER PRIMARY KEY)"""
+    curs.execute(t_grid_table_create)
+    temperatures=np.arange(Tstart,Tend,steps)
+    curs = conn.cursor()
+    for T in temperatures:
+        curs.execute('INSERT OR IGNORE INTO T_grid(T) VALUES(?)',(int(T),))
+    conn.commit()
+    return conn
+
+
+
 def ion_xs(conn):
     print("Creating the ionization cross section table.")
     ion_xs_create_table = """
@@ -494,6 +511,83 @@ def ion_xs(conn):
     conn.commit()
     return conn
 
+
+def do_atom_calc(T):
+    i = 0
+    final_data = np.zeros((len(atomdata),9))
+    #T = data_tuple[0]
+    local_atomdata = atomdata
+    for i,atom in enumerate(local_atomdata):
+        i+=1
+        alpha_sp = radiative_rates.calculate_spontaneous_recomb(atom[3],T[0])
+        alpha_spE =\
+        radiative_rates.calculate_spontaneous_recomb_modified(atom[3],T[0])
+        gamma_f1, gamma_f2 =\
+        radiative_rates.calculate_photoionization_coef(atom[3],T[0])
+        final_data[i,:] =\
+        atom[0],atom[1],atom[2],atom[3],alpha_sp,alpha_spE,gamma_f1,gamma_f2,T[0]
+        if i > 100:
+            break
+    return final_data
+
+def do_atom_calc2(T):
+    local_atomdata = atomdata
+    return radiative_rates_cython.atom_calc(local_atomdata,T)
+
+def create_radiative_rates(conn): 
+    curs = conn.cursor() 
+    print("Creating the radiative rates table") 
+    radiative_rates_table_create = """CREATE TABLE
+        radiative_rates(id INTEGER PRIMARY KEY, atom INTEGER, ion INTEGER, level_id
+        INTEGER, nu_edge FLOAT ,alpha_sp FLOAT, alpha_spE FLOAT, gamma_f1
+        FLOAT, gamma_f2 FLOAT, T INTEGER, FOREIGN KEY(atom, ion, level_id)
+        REFERENCES levels(atom, ion, level_id) ON UPDATE CASCADE ON DELETE
+        CASCADE, FOREIGN KEY(T) REFERENCES T_grid(T) ON UPDATE CASCADE ON
+        DELETE CASCADE)""" 
+    conn.execute(radiative_rates_table_create) 
+    #temperatures: for atom in atomdata: alpha_sp =
+    #curs.execute('INSERT OR IGNORE INTO radiative_rates
+        #(atom,ion,level_id,nu_edge,alpha_sp,alpha_spE,gamma_f1,gamma_f2,T)
+        #VALUES
+        #(?,?,?,?,?,?,?,?,?)',(atom[0],atom[1],atom[2],atom[3],alpha_sp,alpha_spE,gamma_f1,gamma_f2,int(T[0])))
+
+    global temperatures
+    global atomdata 
+    temperatures = np.array(curs.execute('SELECT T FROM T_grid').fetchall()) 
+    atomdata = np.array(curs.execute('SELECT levels.atom, levels.ion, levels.level_id,ion_cx.cx_threshold FROM levels INNER JOIN ion_cx ON levels.level_id=ion_cx.level_id').fetchall()) 
+
+
+    atomdata_T_tuple = [(t,atomdata) for t in temperatures]
+    print(type(atomdata_T_tuple))
+    print(type(do_atom_calc))
+    #output = open('data.pkl', 'wb')
+    #output2 = open('data2.pkl', 'wb')
+    #output3 = open('data3.pkl', 'wb')
+    #pickle.dump(do_atom_calc,output)
+    #pickle.dump(atomdata,output2)
+    #pickle.dump(datomdata_T_tuple,output3)
+    #output.close()
+    #output2.close()
+    #output3.close()
+
+
+
+    multi_pool= multiprocessing.Pool(processes=2) 
+    data = multi_pool.map(do_atom_calc2,temperatures)
+
+    #full_data = np.cornetto([d for d in data],axis=0)
+    #curs.executemany("""INSERT OR IGNORE INTO radiative_rates
+        #(atom,ion,level_id,nu_edge,alpha_sp,alpha_spE,gamma_f1,gamma_f2,T)
+        #VALUES (?,?,?,?,?,?,?,?,?)""",full_data)
+    for d in data:
+        curs.executemany("""INSERT OR IGNORE INTO radiative_rates
+            (atom,ion,level_id,nu_edge,alpha_sp,alpha_spE,gamma_f1,gamma_f2,T)
+            VALUES (?,?,?,?,?,?,?,?,?)""",d)
+
+
+    conn.commit()
+
+    return conn
 
 
 

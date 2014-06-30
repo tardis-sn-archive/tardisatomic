@@ -18,6 +18,8 @@ conn = construct_atom_db.new_linelist_from_gfall(args.dbname,gfall_fname=args.gf
 conn = construct_atom_db.create_levels(conn)
 conn = construct_atom_db.link_levels(conn)
 conn = construct_atom_db.ion_xs(conn)
+conn = construct_atom_db.create_T_grid(conn)
+conn = construct_atom_db.create_radiative_rates(conn)
 construct_atom_db.add_fully_ionized_levels(conn)
 conn.commit()
 

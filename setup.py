@@ -1,5 +1,20 @@
 import sys
 import imp
+from distutils.core import setup
+from distutils.extension import Extension
+from Cython.Distutils import build_ext
+from glob import glob
+import numpy.distutils
+import os
+import subprocess
+
+gsl_ldflags = subprocess.check_output(['gsl-config', '--libs']).split()
+
+extensions = Extension("expint", glob("tardisatomic/*.pyx") + glob("*.pxd"),
+        include_dirs = numpy.distutils.misc_util.get_numpy_include_dirs(),
+        extra_link_args = gsl_ldflags,
+        )
+
 try:
     # This incantation forces distribute to be used (over setuptools) if it is
     # available on the path; otherwise distribute will be downloaded.
@@ -69,7 +84,7 @@ scripts = [fname for fname in glob.glob(os.path.join('scripts', '*'))
            if fname != 'README.rst']
 
 # Additional C extensions that are not Cython-based should be added here.
-extensions = []
+#extensions = []
 
 # A dictionary to keep track of all package data to install
 package_data = {PACKAGENAME: ['data/*']}
@@ -81,8 +96,8 @@ package_dirs = {}
 # any sub-packages that define their own extension modules and package
 # data.  See the docstring for setup_helpers.update_package_files for
 # more details.
-update_package_files(PACKAGENAME, extensions, package_data, packagenames,
-                     package_dirs)
+#update_package_files(PACKAGENAME, extensions, package_data, packagenames,
+                     #package_dirs)
 
 
 setup(name=PACKAGENAME,
@@ -91,7 +106,7 @@ setup(name=PACKAGENAME,
       packages=packagenames,
       package_data=package_data,
       package_dir=package_dirs,
-      ext_modules=extensions,
+      ext_modules=[extensions],
       scripts=scripts,
       requires=['astropy', 'pandas', 'numpy'],
       install_requires=['astropy'],

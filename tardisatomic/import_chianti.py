@@ -1,7 +1,7 @@
 # Importing certain species from the chiantidb into the Kurucz db
-
 import h5py
 import os
+os.environ['XUVTOP'] = "/home/michi/local/share/chianti7.1"
 import numpy as np
 from StringIO import StringIO
 from astropy import table, constants, units
@@ -9,11 +9,13 @@ import chianti.core as ch
 import pandas as pd
 import pdb
 from scipy import interpolate
+from tardisatomic import radiative_rates
 
 kb_ev = constants.k_B.cgs.to('eV / K').value
 
 basic_atom_data = h5py.File(os.path.join(os.path.dirname(__file__), 'data', 'atom_data_basic.h5'))['basic_atom_data']
 symbol2z = dict(zip(basic_atom_data['symbol'], basic_atom_data['atomic_number']))
+
 
 def read_chianti(symbol, ion_number, level_observed=True, temperatures = np.linspace(2000, 50000, 20)):
     ion_data = ch.ion('%s_%d' % (symbol.lower(), ion_number))
