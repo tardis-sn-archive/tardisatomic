@@ -8,4 +8,5 @@ this package is here:
     :maxdepth: 1
 
     running
+    atomicdata/index
 
