@@ -48,7 +48,7 @@ def create_data_sources_overview(data_sources_dict):
 
 def publish_atom_data_sets(file_pattern,
                            base_url='http://moria.astro.utoronto.ca/~wkerzend/tardis_atomic_databases/',
-                           default_atomic_database='kurucz_cd23_full',
+                           default_atomic_database='kurucz_cd23_chianti_H_He',
                            table_fname='current_public_table.rst',
                            publish_directory='published'):
 
