@@ -1,68 +1,62 @@
-import numpy as np
-import sqlite3
+import pandas as pd
 
-f2A_coefficient = (2 * np.pi * constants.e**2) / (constants.me * constants.c)
-f2B_coefficient = (np.pi * constants.e**2) / (constants.me * constants.c)
+class MacroAtomTransitions(object):
+    """
+    Base class for macro atom transitions
 
-class group_concat_intarray(object):
-    def __init__(self):
-        self.list = []
-    
-    def step(self, value):
-        self.list.append(value)
-        
-    def finalize(self):
-        return sqlite3.Binary(
-            np.array(self.list, dtype=np.int64).tostring()
-        )
+    Parameters:
 
-class calculate_p_internal_down(object):
-    def __init__(self):
-        self.p_internals_down = []
-    def step(self, wl, g_lower, g_upper, f_lu, energy_lower):
-        p_internal_down = (wl * 1e-8)**-2  * \
-            f2A_coefficient * \
-            (float(g_lower) / g_upper) * \
-            f_lu * (energy_lower / constants.erg2ev)
-        self.p_internals_down.append(p_internal_down)
-    
-    def finalize(self):
-        return sqlite3.Binary(
-            np.array(self.p_internals_down, dtype=np.float64).tostring()
-        )
-        #for testing purposes only
-        #return ','.join(map(str, self.p_internals_down))
+    levels: ~pandas.DataFrame
+        pandas dataframe with index on atomic_number, ion_number, level_number
+    """
 
-class calculate_p_internal_up(object):
-    def __init__(self):
-        self.p_internals_up = []
-        
-    def step(self, wl, f_lu, energy_lower):
-        p_internal_up = (wl * 1e-8) * f2B_coefficient * f_lu * energy_lower
-        self.p_internals_up.append(p_internal_up)
-    
-    def finalize(self):
-        return sqlite3.Binary(
-            np.array(self.p_internals_up, dtype=np.float64).tostring()
-        )
-        #for testing purposes only
-        #return ','.join(map(str, self.p_internals_up))
+    def __init__(self, levels, lines):
+        macro_atom_transition_columns = ['atomic_number', 'source_ion_number',
+                                         'source_level_number',
+                                         'destination_ion_number',
+                                         'destination_level_number',
+                                         'transition_id']
+
+        self.macro_atom_data = pd.DataFrame(
+            columns=macro_atom_transition_columns)
+
+        self.macro_atom_data.set_index(['atomic_number', 'source_ion_number',
+                                        'source_level_number',
+                                        'destination_ion_number',
+                                        'destination_level_number'],
+                                       inplace=True)
+    ###
+    # !!!! lines 2 indices for upper and lower !!! TODO
+    ####
+    def get_absolute_energy(self, atomic_number, ion_number, level_number):
+        pass
+
+    @property
+    def levels(self):
+        return self._lines
+
+    @levels.setter
+    def levels(self, value):
+        if lines.index.names != ['atomic_number', 'ion_number', 'level_number']:
+            raise ValueError('lines needs to have an index with '
+                             '"atom, ion, level"')
+        else:
+            self._lines = value
 
 
-    
-class calculate_p_emission_down(object):
-    def __init__(self):
-        self.p_emissions_down = []
-    def step(self, wl, g_lower, g_upper, f_lu, energy_delta):
-        p_emission_down = (wl * 1e-8)**-2  * \
-            f2A_coefficient * \
-            (float(g_lower) / g_upper) * \
-            f_lu * (energy_delta / constants.erg2ev)
-        self.p_emissions_down.append(p_emission_down)
-    
-    def finalize(self):
-        return sqlite3.Binary(
-            np.array(self.p_emissions_down, dtype=np.float64).tostring()
-        )
-        #for testing purposes only        
-        #return ','.join(map(str, self.p_emissions_down))
+
+
+class PInternalDown(MacroAtomTransitions):
+
+    def __init__(self, levels, lines, bla):
+        super(PInternalDown,self).__init__(levels, lines)
+
+    transition_id = 0
+
+    def __call__(self, levels, lines):
+        return pd.DataFrame(atomic, source_ion, source_level, destionation_ion, destination_level, transitionid, coef)
+
+
+
+def p_internal_down(levels, lines):
+    pass
