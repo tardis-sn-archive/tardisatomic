@@ -5,15 +5,20 @@ class MacroAtomTransitions(object):
     """
     Base class for macro atom transitions
 
-    Parameters:
+    Parameters
+    ----------
 
     levels: ~pandas.DataFrame
         pandas dataframe with index on atomic_number, ion_number, level_number
+
+    lines: ~pandas.DataFrame
+        pandas dataframe with all line_transitions
+
+    ionization_data: ~pandas.DataFrame
+        pandas dataframe with index on atomic_number, ion_number, level_number
     """
-    _lines = None
 
-
-    def __init__(self, levels, lines, ionization):
+    def __init__(self, levels, lines, ionization_data):
         macro_atom_transition_columns = ['atomic_number', 'source_ion_number',
                                          'source_level_number',
                                          'destination_ion_number',
@@ -28,20 +33,29 @@ class MacroAtomTransitions(object):
                                         'destination_ion_number',
                                         'destination_level_number'],
                                        inplace=True)
-    ###
-    # !!!! lines 2 indices for upper and lower !!! TODO
-    ####
-    def get_absolute_energy(self, atomic_number, ion_number, level_number):
-        _t_levels = self.levels.reset_index()
-        _t_ionization = self.ionization.reset_index()
-        data_merged = _t_levels.merge(_t_ionization, on=['atomic_number', 'ion_number'], how='left')
-        _energy_abs = data_merged['ionization_energy'] + data_merged['energy']
-        _energy_abs = _energy_abs[np.isnan(_energy_abs)] = 0
-        self.levels['energy_abs'] = _energy_abs
+
+        self.levels = levels
+        self.lines = lines
+        self.ionization_data = ionization_data
+
+
+        self.levels['absolute_energy'] = self.get_absolute_energy()
+
+
+    def get_absolute_energy(self):
+        t_levels = self.levels.reset_index()
+        t_ionization = self.ionization_data.reset_index()
+        data_merged = t_levels.merge(t_ionization,
+                                     on=['atomic_number', 'ion_number'],
+                                     how='left')
+        ionization_energy = data_merged['ionization_energy']
+        ionization_energy[np.isnan(ionization_energy)] = 0.0
+        energy_abs = ionization_energy + data_merged['energy']
+        return energy_abs.values
 
     @property
     def levels(self):
-        return self._lines
+        return self._levels
 
     @levels.setter
     def levels(self, value):
@@ -49,27 +63,41 @@ class MacroAtomTransitions(object):
             raise ValueError('lines needs to have an index with '
                              '"atom, ion, level"')
         else:
-            self._lines = value
+            self._levels = value
 
     @property
-    def lines(selfs):
-        return selfs._lines
+    def lines(self):
+        return self._lines
 
     @lines.setter
     def lines(self, value):
-        if value.index.names != ['atomic_number', 'ion_number', 'line_id']:
-            raise ValueError('lines needs to have an index with '
-                             '"atom, ion, line"')
-        else:
-            self._lines = value
+        self._lines = value.reset_index()
 
 
     @property
-    def ionization(self):
+    def lines_level_number_lower(self):
+        """
+        Lines with MultiIndex set to atom, ion, level_number_lower
+        """
+        return self.lines.set_index(['atomic_number', 'ion_number',
+                                     'level_number_lower'])
+
+    @property
+    def lines_level_number_upper(self):
+        """
+        Lines with MultiIndex set to atom, ion, level_number_upper
+        """
+
+        return self.lines.set_index(['atomic_number', 'ion_number',
+                                     'level_number_upper'])
+
+
+    @property
+    def ionization_data(self):
         return self._ionization
 
-    @ionization.setter
-    def ionization(self, value):
+    @ionization_data.setter
+    def ionization_data(self, value):
         if value.index.names != ['atomic_number', 'ion_number']:
             raise ValueError('ionization needs to have an index with '
                              '"atom, ion"')
@@ -79,18 +107,27 @@ class MacroAtomTransitions(object):
 
 
 
+class PEmissionDown(MacroAtomTransitions):
+    """
+    Class to calculate the p emission down transitions
+
+    """
+
+    transition_id = 1
+
+    def __init__(self, levels, lines, ionization_data):
+        super(PInternalDown, self).__init__(levels, lines, ionization_data)
+
+
 
 class PInternalDown(MacroAtomTransitions):
+    """
+    Class to calculate the p internal down transitions
 
-    def __init__(self, levels, lines, bla):
-        super(PInternalDown,self).__init__(levels, lines)
+    """
 
-    transition_id = 0
+    transition_id = 1
 
-    def __call__(self, levels, lines):
-        return pd.DataFrame(atomic, source_ion, source_level, destionation_ion, destination_level, transitionid, coef)
+    def __init__(self, levels, lines, ionization_data):
+        super(PInternalDown, self).__init__(levels, lines, ionization_data)
 
-
-
-def p_internal_down(levels, lines):
-    pass
