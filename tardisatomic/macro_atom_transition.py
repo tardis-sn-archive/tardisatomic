@@ -167,7 +167,7 @@ def p_internal_down(levels, lines):
     pass
 
 
-class PcollisonalExcitation(MacroAtomTransitions):
+class PCollisonalExcitation(MacroAtomTransitions):
     """
     Computes the van regemorter approximation on a temperature grid for the plasma array in TARDIS.
 
@@ -224,7 +224,7 @@ class PcollisonalExcitation(MacroAtomTransitions):
         return c
 
 
-class PcollisonalIonization(MacroAtomTransitions):
+class PCollisonalIonization(MacroAtomTransitions):
     def __init__(self, levels, lines, ionization, ionization_cross_sections, T_grid):
         super(PcollisonalIonization, self).__init__(levels, lines, ionization)
         self._cross_sections = ionization_cross_sections
