@@ -145,7 +145,7 @@ class PEmissionDown(MacroAtomTransitions):
         if 'metastable' not in self.levels:
             raise ValueError('metastable flag has not been set for levels yet')
 
-    def create_transitions_db(self):
+    def compute(self):
         """
         Calculating Database of all transitions
         """
