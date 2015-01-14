@@ -39,8 +39,9 @@ class MacroAtomTransitions(object):
         _t_levels = self.levels.reset_index()
         _t_ionization = self.ionization.reset_index()
         data_merged = _t_levels.merge(_t_ionization, on=['atomic_number', 'ion_number'], how='left')
+        data_merged['ionization_energy'][np.isnan(data_merged['ionization_energy'])] =0
         _energy_abs = data_merged['ionization_energy'] + data_merged['energy']
-        _energy_abs = _energy_abs[np.isnan(_energy_abs)] = 0
+        _energy_abs[np.isnan(_energy_abs)] = 0
         self.levels['energy_abs'] = _energy_abs
 
     @property
@@ -109,6 +110,15 @@ class PcollisonalExcitation(MacroAtomTransitions):
 
 
     def compute(self):
+        self.macro_atom_data.reset_index(inplace=True).set_index(['atomic_number','source_ion_number','source_level_number'])
+        self.macro_atom_data.index = self._levels.index
+
+        self.macro_atom_data ['C_ul_conversion'] = None
+        for T in self._T_grid:
+            column_name = "t%06d" % T
+            self.macro_atom_data[column_name] = None
+
+
         for row in self._lines.reset_index().iterrows():
             row_data = row[1]
             atom = int(row_data['atomic_number'])
@@ -123,14 +133,15 @@ class PcollisonalExcitation(MacroAtomTransitions):
             c_lu = self._compute_van_regemorter(self._T_grid, f_lu, nu)
             C_ul_conversion = g_upper / float(g_lower)
 
-            self.macro_atom_data.ix[(atom, ion, level_number_lower, ion, level_number_upper)][
-                'C_ul_conversion'] = C_ul_conversion
+            self.macro_atom_data.loc[(atom, ion, level_number_lower)]['destination_level_number'] = level_number_upper
+            self.macro_atom_data.loc[(atom, ion, level_number_lower)]['destination_level_number'] = ion
+            self.macro_atom_data.loc[(atom, ion, level_number_lower)]['C_ul_conversion'] = C_ul_conversion
             for T, value in zip(self._T_grid, c_lu):
                 column_name = "t%06d" % T
-                self.macro_atom_data.ix[(atom, ion, level_number_lower, ion, level_number_upper)][column_name] = value
+                self.macro_atom_data.loc[(atom, ion, level_number_lower)][column_name] = value
 
 
-    def _compute_van_regemorter(T, f_lu, nu_lu):
+    def _compute_van_regemorter(self, T, f_lu, nu_lu):
         g = 0.2  # This value is set to 2. We should select the value based on the main quantum number
         u = constants.h.cgs.value * nu_lu / constants.k_B.cgs.value / T
         I = 13.6  # eV
@@ -140,3 +151,22 @@ class PcollisonalExcitation(MacroAtomTransitions):
         c = c0 * T ** (0.5) * 14.5 * (I / constants.h.cgs.value / nu_lu ) * f_lu * constants.h.cgs.value * nu_lu \
             / constants.k_B.cgs.value / T * np.exp(- u)
         return c
+
+
+class PcollisonalIonization(MacroAtomTransitions):
+    def __init__(self, levels, lines, ionization, ionization_cross_sections, T_grid):
+        super(PcollisonalIonization, self).__init__(levels, lines, ionization)
+        self._cross_sections = ionization_cross_sections
+        self._T_grid = T_grid
+
+
+    def compute(self):
+        for row in self._levels.reset_index().iterrows():
+
+        pass
+
+    def _compute_seaton(self, T, ion, sigma_th, nu_th, ):
+        gi = (lambda x: 0.3 if x >=2 else ((lambda x: 0.2 if x==1 else 0.1)(x)))(ion)
+        seaton_const = 1.55e13 # in CGS
+        return  T**(-0.5) * seaton_const * gi * sigma_th / constants.h.cgs.value / nu_th / constants.k_B.cgs / T
+
