@@ -132,9 +132,88 @@ class MacroAtomTransitions(object):
             self._ionization = value
 
 
+class BaseInternalBoundBoundTransition(MacroAtomTransitions):
+
+    def __init__(self, levels, lines, ionization_data):
+        super(BaseInternalBoundBoundTransition, self).__init__(levels,
+                                                               lines,
+                                                               ionization_data)
+        if 'metastable' not in self.levels:
+            raise ValueError('metastable flag has not been set for levels yet')
 
 
-class PEmissionDown(MacroAtomTransitions):
+
+
+    def compute(self, indices=None):
+        """
+        Calculating Database of all transitions
+        """
+        macro_atom_transitions = pd.DataFrame(
+            columns=self.macro_atom_transition_columns)
+
+        if indices is None:
+            indices = self.levels.index
+
+        for index in self.levels.indices:
+            macro_atom_transitions.append(self._compute_transition_group_coef(
+                *index))
+
+        return macro_atom_transitions
+
+    def _compute_transition_group(self, atomic_number, ion_number,
+                                    level_number):
+
+        """
+        Calculate the transitions pre-coefficients for a single level
+
+        Parameters
+        ----------
+
+        atomic_number: int
+        ion_number: int
+        level_number: int
+
+        Returns
+        -------
+
+            : None or ~pandas.DataFrame
+            Returns None if no downward transitions exist, otherwise returns
+            a DataFrame
+        """
+
+        index = atomic_number, ion_number, level_number
+        (energy, g, metastable, abs_energy) = self.levels.loc[index].values
+        
+        transitions_group, destination_level_index = self.get_transitions_group(index)
+
+        if transitions_group is None:
+            return None
+
+        temp_transitions = pd.DataFrame(columns=
+                                        self.macro_atom_transition_columns)
+        destination_level_energy = (
+            self.levels.energy.loc[destination_level_index].values)
+
+        p_coef = self._calculate_p_coeff(transitions_group.nu.values,
+                                          transitions_group.f_ul.values,
+                                          transitions_group.f_lu.values,
+
+                                          energy, destination_level_energy)
+
+        temp_transitions['p_coef'] = p_coef
+        temp_transitions['atomic_number'] = atomic_number
+        temp_transitions['source_ion_number'] = ion_number
+        temp_transitions['destination_ion_number'] = ion_number
+        temp_transitions['source_level_number'] = level_number
+        temp_transitions['destination_level_number'] = (np.array(
+            destination_level_index)[:,2])
+
+        temp_transitions['transition_id'] = self.transition_id
+
+        return temp_transitions
+
+
+class PEmissionDown(BaseInternalBoundBoundTransition):
     """
     Class to calculate the p emission down transitions
 
@@ -142,29 +221,67 @@ class PEmissionDown(MacroAtomTransitions):
 
     transition_id = 1
 
-    def __init__(self, levels, lines, ionization_data):
-        super(PEmissionDown, self).__init__(levels, lines, ionization_data)
-        if 'metastable' not in self.levels:
-            raise ValueError('metastable flag has not been set for levels yet')
 
-    def compute(self):
-        """
-        Calculating Database of all transitions
-        """
-        macro_atom_transitions = pd.DataFrame(
-            columns=self.macro_atom_transition_columns)
+    def get_transitions_group(self, index):
+        if self.levels.loc[index].metastable:
+            return None, None
+        else:
+            transition_group = self.lines_level_number_upper_gby.get_group(index)
+            destination_levels = map(tuple, transition_group[
+                ['atomic_number', 'ion_number', 'level_number_lower']].values)
+            return transition_group, destination_levels
 
-        for index, data in self.levels.iterrows():
-            temp_data = pd.DataFrame(columns=self.macro_atom_transition_columns)
-            (energy, g, metastable, abs_energy) = data
-            try:
-                down_transitions = self.lines_level_number_upper_gby.get_group(
-                    index)
-            except KeyError:
-                continue
 
-def p_internal_down(levels, lines):
-    pass
+    @staticmethod
+    def _calculate_p_coeff(nu, f_ul, f_lu, source_level_energy,
+                            destination_level_energy):
+        return (2 * nu**2 * f_ul / constants.c.cgs.value**2 *
+                (source_level_energy - destination_level_energy))
+
+
+class PInternalDown(BaseInternalBoundBoundTransition):
+
+    transition_id = 2
+
+
+    def get_transitions_group(self, index):
+        if self.levels.loc[index].metastable:
+            return None, None
+        else:
+            transition_group = self.lines_level_number_upper_gby.get_group(index)
+            destination_levels = map(tuple, transition_group[
+                ['atomic_number', 'ion_number', 'level_number_lower']].values)
+            return transition_group, destination_levels
+
+    @staticmethod
+    def _calculate_p_coeff(nu, f_ul, f_lu, source_level_energy,
+                            destination_level_energy):
+        return ((2 * nu**2 * f_ul / constants.c.cgs.value**2)
+                * destination_level_energy)
+
+
+class PInternalUp(BaseInternalBoundBoundTransition):
+
+    transition_id = 2
+
+
+    def get_transitions_group(self, index):
+        if self.levels.loc[index].metastable:
+            return None
+        else:
+            transition_group = self.lines_level_number_lower_gby.get_group(index)
+            destination_levels = map(tuple, transition_group[
+                ['atomic_number', 'ion_number', 'level_number_upper']].values)
+            return transition_group, destination_levels
+
+
+    @staticmethod
+    def _calculate_p_coeff(nu, f_ul, f_lu, source_level_energy,
+                            destination_level_energy):
+        return f_lu * source_level_energy / (constants.h.cgs.value * nu)
+
+
+
 
 
 class PCollisonalExcitation(MacroAtomTransitions):
@@ -233,8 +350,7 @@ class PCollisonalIonization(MacroAtomTransitions):
 
     def compute(self):
         for row in self._levels.reset_index().iterrows():
-
-        pass
+            pass
 
     def _compute_seaton(self, T, ion, sigma_th, nu_th, ):
         gi = (lambda x: 0.3 if x >=2 else ((lambda x: 0.2 if x==1 else 0.1)(x)))(ion)
