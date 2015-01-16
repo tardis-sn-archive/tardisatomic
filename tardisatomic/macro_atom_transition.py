@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import scipy.special as scisp
 from astropy import constants, units
-
+from scipy.integrate import quad
 
 class MacroAtomTransitions(object):
     """
@@ -111,7 +111,7 @@ class PcollisonalExcitation(MacroAtomTransitions):
 
     def compute(self):
         self.macro_atom_data.reset_index(inplace=True).set_index(['atomic_number','source_ion_number','source_level_number'])
-        self.macro_atom_data.index = self._levels.index
+        self.macro_atom_data.index = self._lines.index
 
         self.macro_atom_data ['C_ul_conversion'] = None
         for T in self._T_grid:
@@ -127,8 +127,8 @@ class PcollisonalExcitation(MacroAtomTransitions):
             f_lu = row_data['f_lu']
             level_number_upper = int(row_data['level_number_upper'])
             level_number_lower = int(row_data['level_number_lower'])
-            g_upper = self._levels.ix[(atom, ion, level_number_upper)]
-            g_lower = self._levels.ix[(atom, ion, level_number_lower)]
+            g_upper = self._levels.ix[(atom, ion, level_number_upper)]['g']
+            g_lower = self._levels.ix[(atom, ion, level_number_lower)]['g']
 
             c_lu = self._compute_van_regemorter(self._T_grid, f_lu, nu)
             C_ul_conversion = g_upper / float(g_lower)
@@ -157,16 +157,110 @@ class PcollisonalIonization(MacroAtomTransitions):
     def __init__(self, levels, lines, ionization, ionization_cross_sections, T_grid):
         super(PcollisonalIonization, self).__init__(levels, lines, ionization)
         self._cross_sections = ionization_cross_sections
+        self._ionization = ionization
         self._T_grid = T_grid
 
 
     def compute(self):
-        for row in self._levels.reset_index().iterrows():
+        self.macro_atom_data.reset_index(inplace=True).set_index(['atomic_number','source_ion_number','source_level_number'])
+        self.macro_atom_data.index = self._levels.index
 
-        pass
+        for T in self._T_grid:
+            column_name = "t%06d" % T
+            self.macro_atom_data[column_name] = None
+
+        for row in self._levels.reset_index().iterrows():
+            row_data = row[1]
+            atom = int(row_data['atomic_number'])
+            ion = int(row_data['ion_number'])
+            level_number = int(row_data['level_number'])
+            level_energy = row_data['energy']
+            sigma_ion = self._cross_sections.ix[(atom,ion,level_number)]['ion_cx_threshold']
+            ionization_energy_ion = self._ionization.ix[(atom, ion)]['ionization_energy']
+            ionization_energy_level = ionization_energy_ion - level_energy
+            ionization_nu_level = ionization_energy_level / constants.h.cgs
+            is_last_ion = self._levels.ix[[atom]].reset_index()['ion_number'].max() == ion
+
+            if is_last_ion:
+                c = [0] * len(self._T_grid)
+                destination_level_number = 0
+                destination_ion_number = 0
+            else:
+                c = self._compute_seaton(T, ion,sigma_ion, ionization_nu_level)
+                destination_level_number = 0
+                destination_ion_number = ion + 1
+
+            self.macro_atom_data.loc[(atom, ion, level_number)]['destination_level_number'] = destination_level_number
+            self.macro_atom_data.loc[(atom, ion, level_number)]['destination_ion_number'] = destination_ion_number
+            for T, value in zip(self._T_gri, c):
+                column_name = "t%06d" % T
+                self.macro_atom_data.loc[(atom, ion, level_number)][column_name] = value
+
 
     def _compute_seaton(self, T, ion, sigma_th, nu_th, ):
         gi = (lambda x: 0.3 if x >=2 else ((lambda x: 0.2 if x==1 else 0.1)(x)))(ion)
         seaton_const = 1.55e13 # in CGS
-        return  T**(-0.5) * seaton_const * gi * sigma_th / constants.h.cgs.value / nu_th / constants.k_B.cgs / T
+        return  T**(-0.5) * seaton_const * gi * sigma_th / constants.h.cgs.value / nu_th / constants.k_B.cgs.value / T
+
+
+class PcollisonalRecombination(MacroAtomTransitions):
+    def __init__(self, levels, lines, ionization, ionization_cross_sections, T_grid):
+        super(PcollisonalIonization, self).__init__(levels, lines, ionization)
+        self._cross_sections = ionization_cross_sections
+        self._ionization = ionization
+        self._T_grid = T_grid
+
+
+    def compute(self):
+           
+
+
+
+    #integral for the spontaneous recombinations to level i (Mihalas 131)
+    @np.vectorize
+    def spont_recom_int(phi, nu_th,  T, sigma_i):
+
+        """
+        solution for the integral
+        ..math::
+        \\alpha^{sp}_i = 4 \\pi \\phi \\int_{\\nu}^{\\infty} \\frac{a_{ik}(\\nu)}{h\\nu} \\frac{2 h \\nu^3}{c^2} e^{-h \\nu / kt}
+        \\alpha^{sp}_i = 4 \\pi \\phi \\frac{a_{i} 2}{c^2} Ei\\left(- \frac{  h}{kt} \right)
+        @param phi: saha factor
+        @param nu_th: photo ionization threshold frequency
+        @param T: temperature
+        @param sigma_i: photo ionization cross section
+        @return:
+        """
+        h_cgs = constants.h.cgs.value
+        k_B_cgs = constants.k_B.cgs.value
+        c_cgs = constants.c.cgs.value
+
+        def integrand1(x, a):
+            return 1/x * np.exp(- a * x)
+
+        a =h_cgs / k_B_cgs / T
+        helper1, nerror = quad(integrand1,nu_th, np.inf,  args=(a))
+        return 8. * np.pi * phi * sigma_i * nu_th**3 /  c_cgs**2 * helper1
+
+
+    #integral for the modified  spontaneous recombinations to level i (Lucy 2003 MC II Eq. 20)
+    @np.vectorize
+    def mod_spont_recom_int(phi, nu_th,  T, sigma_i):
+
+        """
+        ..math::
+        alpha^{E,sp}_i = 4 \pi \Phi \int_{\nu_i}^{\infty} \frac{a_{i\kappa}(\nu)}{h \nu_i} \frac{2 h \nu^3}{c^2} e^{\frac{-h\nu}{k T}} d \nu
+        alpha^{E,sp}_i \\frac{ 8 a_i k_B T \\phi \\nu_i^2 }{c^2 h} e^{frac{\\nu_i h}{k_B T}}
+        @param phi: saha factor
+        @param nu_th: photo ionization threshold frequency
+        @param T: temperature
+        @param sigma_i: photo ionization cross section
+        @return:
+        """
+        h_cgs = constants.h.cgs.value
+        k_B_cgs = constants.k_B.cgs.value
+        c_cgs = constants.c.cgs.value
+
+        return 8. * np.pi * sigma_i * k_B_cgs * T *  phi * nu_th**2 / c_cgs**2 / h_cgs\
+               * np.exp(nu_th * h_cgs / k_B_cgs / T)
 
