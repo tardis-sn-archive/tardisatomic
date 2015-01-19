@@ -4,22 +4,22 @@
 Macro Atom Data
 ***************
 
+.. currentmodule:: tardisatomic.macro_atom_transition
+
 The macro atom is described in detail in :cite:`2002A&A...384..725L`. The basic principal is that when an energy packet
-is absorbed that the macro atom is on a certain level. Three probabilities govern the next step the P\ :sub:`up`,
+is absorbed that the macro atom is on a certain level. A set of probabilities govern the next steps. For example, the P\ :sub:`up`,
 P\ :sub:`down` and P\ :sub:`down emission` being the probability for going to a higher level, a lower level and a lower
 level and emitting a photon while doing this respectively (see Figure 1 in :cite:`2002A&A...384..725L` ).
 
+The macro atom is the most complex idea to implement as a data structure. The setup is done here in `~tardisatomic` for the coefficients
+that are known beforehand.
 
-The macro atom is the most complex idea to implement as a data structure. The setup is done in `~tardisatomic`, but
-we will nonetheless discuss it here (as `~tardisatomic` is even less documented than this one).
-
-For each level we look at the line list to see what transitions (upwards or downwards are possible). We create a two arrays,
-the first is a long one-dimensional array containing the probabilities. Each level contains a set of probabilities, The first
+For each level we look at the line list to see what transitions are possible
+for each transition class (:ref:`transition_classes`). For each of the transition
+probability classes we generate one `~pandas.DataFrame`. Each level contains a set of probabilities, The first
 part of each set contains the upwards probabilities (internal upward), the second part the downwards probabilities
 (internal downward), and the last part is the downward and emission probability.
 
-
-each set is stacked after the other one to make one long one dimensional `~numpy.ndarray`.
 
 The second array is for book-keeping it has exactly the length as levels (with an example for the Si II level 15):
 
@@ -30,17 +30,42 @@ The second array is for book-keeping it has exactly the length as levels (with a
 +--------+------------------+------------+----------------+-----------------+
 
 
-We now will calculate the transition probabilites, using the radiative rates in Equation 20, 21, and 22
-in :cite:`2002A&A...384..725L`. Then we calculate the downward emission probability from Equation 5, the downward and
-upward internal transition probabilities in :cite:`2003A&A...403..261L`.
+
+
+.. _transition_classes:
+
+Transition Categories
+=====================
+
+There are several transition categories characterised by different identification numbers:
+
+
++----------------------------+-------------+--------------------------+------------------------------+
+|Name                        |Transition ID|Class                     | Section                      |
++----------------------------+-------------+--------------------------+------------------------------+
+|Emission Down               |1            |:class:`PEmissionDown`    |:ref:`rad_int_bound_bound`    |
++----------------------------+-------------+--------------------------+------------------------------+
+
+.. _rad_int_bound_bound:
+
+Radiative and Internal Bound-Bound
+----------------------------------
+
+The three internal and radiative bound-bound transition classes P\ :sub:`up` (``id=1``),
+P\ :sub:`down` (``id=2``) and P\ :sub:`down emission` (``id=3``; :class:`PEmissionDown`) are calculated
+
+We now will calculate the transition probabilites, using the radiative rates
+in Equation 20, 21, and 22 in :cite:`2002A&A...384..725L`. Then we calculate the
+downward emission probability from Equation 5, the downward and upward internal
+transition probabilities in :cite:`2003A&A...403..261L`.
 
 .. math::
     p_\textrm{emission down}&= {\cal R}_{\textrm{i}\rightarrow\textrm{lower}}\,(\epsilon_\textrm{upper} - \epsilon_\textrm{lower}) / {\cal D}_{i}\\
     p_\textrm{internal down}&= {\cal R}_{\textrm{i}\rightarrow\textrm{lower}}\,\epsilon_\textrm{lower}/{\cal D}_{i}\\,
     p_\textrm{internal up}&={\cal R}_{\textrm{i}\rightarrow\textrm{upper}}\,\epsilon_{i}/{\cal D}_{i}\\,
 
-where :math:`i` is the current level, :math:`\epsilon` is the energy of the level, and :math:`{\cal R}` is the radiative
- rates.
+where :math:`i` is the current level, :math:`\epsilon` is the energy of the level,
+and :math:`{\cal R}` is the radiative rates.
 
 
 We ignore the probability to emit a k-packet as TARDIS only works with photon packets.
@@ -94,7 +119,7 @@ This results in the transition probabilities:
                                                     \beta_\textrm{Sobolev} J_{\nu}^{b}\,\epsilon_{i}/{\cal D}_{i}\\,
 
 and as we will normalise the transition probabilities numerically later,  we can get rid of :math:`C_\textrm{Einstein}`,
- :math:`\frac{1}{{\cal D}_i}` and number densities.
+:math:`\frac{1}{{\cal D}_i}` and number densities.
 
 .. math::
     p_\textrm{emission down}&= \frac{2\nu^2}{c^2} \frac{g_\textrm{lower}}{g_\textrm{i}}~f_{\textrm{lower}\rightarrow\textrm{i}}
@@ -122,3 +147,6 @@ and one that is computed during the plasma calculations:
                                                         \beta_\textrm{Sobolev} J_{\nu}^{b}\,
                                                         (1-\frac{g_\textrm{i}}{g_\textrm{upper}}\frac{n_\textrm{upper}}{n_i})
                                                         \,\epsilon_{i}.
+
+
+.. automodapi:: tardisatomic.macro_atom_transition

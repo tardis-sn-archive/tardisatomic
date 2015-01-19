@@ -6,3 +6,4 @@ Atomic Data Storage
     :maxdepth: 1
 
     atomic_data_description
+    macroatom
