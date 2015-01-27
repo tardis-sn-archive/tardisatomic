@@ -6,6 +6,8 @@ from scipy.integrate import quad
 
 from astropy import constants
 
+import ipdb
+
 class MacroAtomTransitions(object):
     """
     Base class for macro atom transitions
@@ -286,7 +288,7 @@ class PInternalUp(BaseInternalBoundBoundTransition):
 
 
 
-class PCollisonalExcitation(MacroAtomTransitions):
+class PcollisonalExcitation(MacroAtomTransitions):
     """
     Computes the van regemorter approximation on a temperature grid for the plasma array in TARDIS.
 
@@ -294,14 +296,16 @@ class PCollisonalExcitation(MacroAtomTransitions):
     """
 
     def __init__(self, levels, lines, ionization, ionization_cross_sections, T_grid):
-        super(PCollisonalExcitation, self).__init__(levels, lines, ionization)
+        super(PcollisonalExcitation, self).__init__(levels, lines, ionization)
         self._cross_sections = ionization_cross_sections
         self._T_grid = T_grid
 
 
     def compute(self):
-        self.macro_atom_data.reset_index(inplace=True).set_index(['atomic_number','source_ion_number','source_level_number'])
-        self.macro_atom_data.index = self._lines.index
+        self.macro_atom_data = self.macro_atom_data.reset_index().set_index(['atomic_number','source_ion_number','source_level_number'])
+        self.macro_atom_data = pd.DataFrame(index=self.levels.index, columns=self.macro_atom_transition_columns)
+        self.macro_atom_data = self.macro_atom_data.drop('source_level_number',1)
+        self.macro_atom_data.index.names = ['atomic_number','source_ion_number','source_level_number']
 
         self.macro_atom_data ['C_ul_conversion'] = None
         for T in self._T_grid:
@@ -344,16 +348,22 @@ class PCollisonalExcitation(MacroAtomTransitions):
 
 
 class PcollisonalIonization(MacroAtomTransitions):
+    """
+
+    """
     def __init__(self, levels, lines, ionization, ionization_cross_sections, T_grid):
-        super(PcollisonalIonization, self).__init__(levels, lines, ionization)
         self._cross_sections = ionization_cross_sections
         self._ionization = ionization
         self._T_grid = T_grid
+        super(PcollisonalIonization, self).__init__(levels, lines, ionization)
 
 
     def compute(self):
-        self.macro_atom_data.reset_index(inplace=True).set_index(['atomic_number','source_ion_number','source_level_number'])
-        self.macro_atom_data.index = self._levels.index
+        self.macro_atom_data = self.macro_atom_data.reset_index().set_index(['atomic_number','source_ion_number','source_level_number'])
+        self.macro_atom_data = pd.DataFrame(index=self.levels.index, columns=self.macro_atom_transition_columns)
+        self.macro_atom_data = self.macro_atom_data.drop('source_level_number',1)
+        self.macro_atom_data.index.names = ['atomic_number','source_ion_number','source_level_number']
+
 
         for T in self._T_grid:
             column_name = "t%06d" % T
@@ -362,29 +372,41 @@ class PcollisonalIonization(MacroAtomTransitions):
         for row in self._levels.reset_index().iterrows():
             row_data = row[1]
             atom = int(row_data['atomic_number'])
-            ion = int(row_data['ion_number'])
-            level_number = int(row_data['level_number'])
-            level_energy = row_data['energy']
-            sigma_level = self._cross_sections.ix[(atom,ion,level_number)]['ion_cx_threshold']
-            ionization_energy_ion = self._ionization.ix[(atom, ion)]['ionization_energy']
-            ionization_energy_level = ionization_energy_ion - level_energy
-            ionization_nu_level = ionization_energy_level / constants.h.cgs
-            is_last_ion = self._levels.ix[[atom]].reset_index()['ion_number'].max() == ion
+            ion = int(row_data['source_ion_number'])
+            level_number = int(row_data['source_level_number'])
+            level_energy = row_data['absolute_energy']
+            #ipdb.set_trace()
+            print('>>>')
+            print(atom)
+            print(ion)
+            print(level_number)
+            print('<<<')
+            is_neutral = self.levels.ix[[atom]].reset_index()['source_ion_number'].min() == 0
+            is_fully_ionized = ion == atom
+            if not is_fully_ionized:
+                sigma_level = self._cross_sections.ix[(atom,ion,level_number)]['ion_cx_threshold']
+                ionization_energy_ion = self._ionization.ix[(atom, ion+1)]['ionization_energy']
+                ionization_energy_level = ionization_energy_ion - level_energy
+                ionization_nu_level = ionization_energy_level / constants.h.cgs.value
+            else:
+                sigma_level = 0
+                ionization_energy_ion = 0
+                ionization_energy_level = 0
+                ionization_nu_level = 0
 
-            if is_last_ion:
+            if is_fully_ionized:
                 c = [0] * len(self._T_grid)
                 destination_level_number = 0
                 destination_ion_number = 0
             else:
-                c = self._compute_seaton(T, ion,sigma_level, ionization_nu_level)
+                c = self._compute_seaton(self._T_grid, ion,sigma_level, ionization_nu_level)
                 destination_level_number = 0
                 destination_ion_number = ion + 1
-
             self.macro_atom_data.loc[(atom, ion, level_number)]['destination_level_number'] = destination_level_number
             self.macro_atom_data.loc[(atom, ion, level_number)]['destination_ion_number'] = destination_ion_number
-            for i,( T, value) in enumerate(zip(self._T_gri, c)):
+            for i,( T, value) in enumerate(zip(self._T_grid, c)):
                 column_name = "t%06d" % T
-                self.macro_atom_data.loc[(atom, ion, level_number)][column_name] = value[i]
+                self.macro_atom_data.loc[(atom, ion, level_number)][column_name] = value
 
 
     def _compute_seaton(self, T, ion, sigma_th, nu_th, ):
@@ -395,36 +417,51 @@ class PcollisonalIonization(MacroAtomTransitions):
 
 class PcollisonalRecombination(MacroAtomTransitions):
     def __init__(self, levels, lines, ionization, ionization_cross_sections, T_grid):
-        super(PcollisonalIonization, self).__init__(levels, lines, ionization)
+        super(PcollisonalRecombination, self).__init__(levels, lines, ionization)
         self._cross_sections = ionization_cross_sections
         self._ionization = ionization
         self._T_grid = T_grid
 
 
     def compute(self):
-        self.macro_atom_data.reset_index(inplace=True).set_index(['atomic_number','source_ion_number','source_level_number'])
-        self.macro_atom_data.index = self._levels.index
+        self.macro_atom_data = self.macro_atom_data.reset_index().set_index(['atomic_number','source_ion_number','source_level_number'])
+        self.macro_atom_data = pd.DataFrame(index=self.levels.index, columns=self.macro_atom_transition_columns)
+        self.macro_atom_data = self.macro_atom_data.drop('source_level_number',1)
+        self.macro_atom_data.index.names = ['atomic_number','source_ion_number','source_level_number']
         for T in self._T_grid:
             column_name_asp = "asp_t%06d" % T
             column_name_easp = "aspe_t%06d" % T
             self.macro_atom_data[column_name_asp] = None
             self.macro_atom_data[column_name_easp] = None
 
-        for row in self._levels.reset_index().iterrows():
+        for row in self.levels.reset_index().iterrows():
             row_data = row[1]
             atom = int(row_data['atomic_number'])
-            ion = int(row_data['ion_number'])
-            level_number = int(row_data['level_number'])
-            level_energy = row_data['energy']
-            sigma_level = self._cross_sections.ix[(atom,ion,level_number)]['ion_cx_threshold']
-            ionization_energy_ion = self._ionization.ix[(atom, ion)]['ionization_energy']
-            ionization_energy_level = ionization_energy_ion - level_energy
-            ionization_nu_level = ionization_energy_level / constants.h.cgs
-            is_neutral = self._levels.ix[[atom]].reset_index()['ion_number'].min() == 0
+            ion = int(row_data['source_ion_number'])
+            level_number = int(row_data['source_level_number'])
+            level_energy = row_data['absolute_energy']
+            #ipdb.set_trace()
+            print('>>>')
+            print(atom)
+            print(ion)
+            print(level_number)
+            print('<<<')
+            is_neutral = self.levels.ix[[atom]].reset_index()['source_ion_number'].min() == 0
+            is_fully_ionized = ion == atom
+            if not is_fully_ionized:
+                sigma_level = self._cross_sections.ix[(atom,ion,level_number)]['ion_cx_threshold']
+                ionization_energy_ion = self._ionization.ix[(atom, ion+1)]['ionization_energy']
+                ionization_energy_level = ionization_energy_ion - level_energy
+                ionization_nu_level = ionization_energy_level / constants.h.cgs
+            else:
+                sigma_level = 0
+                ionization_energy_ion = 0
+                ionization_energy_level = 0
+                ionization_nu_level = 0
 
             if is_neutral:
-                asp = 0
-                aspe = 0
+                asp = [0] *len(self._T_grid)
+                aspe = [0] * len(self._T_grid)
                 destination_ion_number = ion
                 destination_level_number = level_number
             else:
@@ -437,11 +474,11 @@ class PcollisonalRecombination(MacroAtomTransitions):
             self.macro_atom_data.loc[(atom, ion, level_number)]['destination_level_number'] = destination_level_number
             self.macro_atom_data.loc[(atom, ion, level_number)]['destination_ion_number'] = destination_ion_number
 
-            for i,(T, value_asp, value_easp) in enumerate(zip(self._T_gri, asp, aspe)):
+            for i,(T, value_asp, value_easp) in enumerate(zip(self._T_grid, asp, aspe)):
                 column_name_asp = "asp_t%06d" % T
                 column_name_easp = "aspe_t%06d" % T
-                self.macro_atom_data.loc[(atom, ion, level_number)][column_name_asp] = value_asp[i]
-                self.macro_atom_data.loc[(atom, ion, level_number)][column_name_easp] = value_easp[i]
+                self.macro_atom_data.loc[(atom, ion, level_number)][column_name_asp] = value_asp
+                self.macro_atom_data.loc[(atom, ion, level_number)][column_name_easp] = value_easp
 
 
 
