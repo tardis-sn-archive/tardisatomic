@@ -288,7 +288,7 @@ class PInternalUp(BaseInternalBoundBoundTransition):
 
 
 
-class PcollisonalExcitation(MacroAtomTransitions):
+class PcollisionalExcitation(MacroAtomTransitions):
     """
     Computes the van regemorter approximation on a temperature grid for the plasma array in TARDIS.
 
@@ -296,7 +296,7 @@ class PcollisonalExcitation(MacroAtomTransitions):
     """
 
     def __init__(self, levels, lines, ionization, ionization_cross_sections, T_grid):
-        super(PcollisonalExcitation, self).__init__(levels, lines, ionization)
+        super(PcollisionalExcitation, self).__init__(levels, lines, ionization)
         self._cross_sections = ionization_cross_sections
         self._T_grid = T_grid
 
@@ -340,14 +340,14 @@ class PcollisonalExcitation(MacroAtomTransitions):
         u = constants.h.cgs.value * nu_lu / constants.k_B.cgs.value / T
         I = 13.6  # eV
         c0 = 5.46510e-11
-        integ = 0.276 * np.exp(u) * scisp.exp1(u)
-        gamma = (g, integ )
-        c = c0 * T ** (0.5) * 14.5 * (I / constants.h.cgs.value / nu_lu ) * f_lu * constants.h.cgs.value * nu_lu \
-            / constants.k_B.cgs.value / T * np.exp(- u)
+        gamma = lambda a,u: max(a,(0.276 * np.exp(u) * scisp.exp1(u)))
+        #c = c0 * T ** (0.5) * 14.5 * (I / constants.h.cgs.value / nu_lu ) * f_lu * constants.h.cgs.value * nu_lu \
+        #    / constants.k_B.cgs.value / T * np.exp(- u) * gamma
+        c = c0 * T ** (0.5) * 14.5 * (I / constants.h.cgs.value / nu_lu ) * f_lu * u * np.exp(- u) * gamma(g, u)
         return c
 
 
-class PcollisonalIonization(MacroAtomTransitions):
+class PcollisionalIonization(MacroAtomTransitions):
     """
 
     """
@@ -355,7 +355,7 @@ class PcollisonalIonization(MacroAtomTransitions):
         self._cross_sections = ionization_cross_sections
         self._ionization = ionization
         self._T_grid = T_grid
-        super(PcollisonalIonization, self).__init__(levels, lines, ionization)
+        super(PcollisionalIonization, self).__init__(levels, lines, ionization)
 
 
     def compute(self):
@@ -415,9 +415,9 @@ class PcollisonalIonization(MacroAtomTransitions):
         return  T**(-0.5) * seaton_const * gi * sigma_th / constants.h.cgs.value / nu_th / constants.k_B.cgs.value / T
 
 
-class PcollisonalRecombination(MacroAtomTransitions):
+class PfreeboundRecombination(MacroAtomTransitions):
     def __init__(self, levels, lines, ionization, ionization_cross_sections, T_grid):
-        super(PcollisonalRecombination, self).__init__(levels, lines, ionization)
+        super(PfreeboundRecombination, self).__init__(levels, lines, ionization)
         self._cross_sections = ionization_cross_sections
         self._ionization = ionization
         self._T_grid = T_grid
