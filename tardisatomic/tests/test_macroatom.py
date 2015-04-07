@@ -8,6 +8,19 @@ from tardisatomic.macro_atom_transition import (MacroAtomTransitions,
                                                 PEmissionDown, PInternalDown,
                                                 PInternalUp)
 
+@pytest.fixture
+def disk_table():
+    import numpy
+    return numpy.loadtxt('lksdjflsdkfj.txt')
+
+
+@pytest.fixture
+def disk_row(disk_table):
+    return disk_table[0]
+
+
+def test_table(disk_table):
+    assert disk_table is not None
 
 @pytest.fixture
 def macro_atom_transitions(atomic_levels, atomic_lines, atomic_ionization_data):
