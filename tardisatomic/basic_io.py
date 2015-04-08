@@ -56,17 +56,24 @@ class BasicAtomicData(object):
         self.__config = value
 
 
+    def __get_sql_conn(self):
+        # get the SQL db
+        try:
+            sqlstr = self.config['SQL_ATOMIC_DB']
+            sqlconn = sqlite3.connect(sqlstr)
+            return sqlconn
+        except KeyError:
+            logging.critical('No atomic database given in the configuration')
+            raise
+
+
 class LoadLevelsAndLines(BasicAtomicData):
     def load_data(self):
 
         # get the SQL db
-        try:
-            sqlstr = self.config['SQL_ATOMIC_DB']
-            self.sqlconn = sqlite3.connect(sqlstr)
 
-        except KeyError:
-            logging.critical('No atomic database given in the configuration')
-            raise
+        self.sqlconn = self.__get_sql_conn()
+
 
         levels_sql_stmt = 'select atom, ion, level_id, energy, g, source from levels '
         try:
@@ -324,5 +331,48 @@ class ZetaData(BasicAtomicData):
             hdf5_file['zeta_data'] = self.zeta_data
             hdf5_file['zeta_data'].attrs['t_rad'] = np.arange(2000, 42000, 2000)
             hdf5_file['zeta_data'].attrs['source'] = 'Used with kind permission from Knox Long'
+
+
+class MacroAtomData(BasicAtomicData):
+    """
+    Here comes the new macroatom
+
+    """
+    # ToDo: Wolfgang will add the new macroatom ;-)
+
+    def load(self):
+        pass
+
+
+class CollisionData(BasicAtomicData):
+    def load(self):
+        self.sqlconn = self.__get_sql_conn()
+        collision_data_exists = \
+        self.sqlconn.execute('SELECT count(name) FROM sqlite_master WHERE name="collision_data"').fetchone()[0]
+        if collision_data_exists == 0:
+            logging.warning("WARNING: Collision data requested but not in the database")
+            raise
+
+        collision_columns = zip(*self.sqlconn.execute('PRAGMA table_info(collision_data)').fetchall())[1]
+        temperature_columns = [item for item in collision_columns if item.startswith('t')]
+        self._temperatures = [float(item[1:]) for item in temperature_columns]
+        select_collision_stmt = "select atom, ion, level_number_upper, level_number_lower, g_ratio, delta_e, %s" \
+                                " from collision_data"
+
+        select_collision_stmt = select_collision_stmt % (', '.join(temperature_columns))
+
+        collision_data_dtype = [('atomic_number', np.int), ('ion_number', np.int), ('level_number_upper', np.int),
+                                ('level_number_lower', np.int), ('g_ratio', np.float), ('delta_e', np.float)]
+
+        collision_data_dtype += [(str(item), np.float) for item in temperature_columns]
+
+        collision_data = self.sqlconn.execute(select_collision_stmt).fetchall()
+        self._collision_data = np.array(collision_data, dtype=collision_data_dtype)
+
+    def save(self):
+        with h5py.File(self.config['HDF5_FILE']) as hdf5_file:
+            hdf5_file['collision_data'] = self._collision_data
+            hdf5_file['collision_data'].attrs['temperatures'] = self._temperatures
+
 
 
