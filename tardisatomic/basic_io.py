@@ -3,6 +3,7 @@ import sqlite3
 import numpy as np
 from astropy import constants, units
 import h5py
+import os
 
 import pandas as pd
 
@@ -312,5 +313,16 @@ class LoadLevelsAndLines(BasicAtomicData):
             hdf5_file['lines_data'] = self.lines_data.reset_index().to_records(index=False)
             hdf5_file['levels_data'] = self.levels_data.reset_index().to_records(index=False)
 
+
+class ZetaData(BasicAtomicData):
+    def load_data(self):
+        zeta_datafile = os.path.join(os.path.dirname(__file__), 'data', 'knox_long_recombination_zeta.dat')
+        self.zeta_data = np.loadtxt(zeta_datafile, usecols=xrange(1, 23), dtype=np.float64)
+
+    def save(self):
+        with h5py.File(self.config['HDF5_FILE']) as hdf5_file:
+            hdf5_file['zeta_data'] = self.zeta_data
+            hdf5_file['zeta_data'].attrs['t_rad'] = np.arange(2000, 42000, 2000)
+            hdf5_file['zeta_data'].attrs['source'] = 'Used with kind permission from Knox Long'
 
 
