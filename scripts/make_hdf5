@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+
+import argparse
+
+from tardisatomic.basic_io import LevelsLines
+
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('hdf5', help='HDF5 file that is created')
+parser.add_argument('atom_db', help='atom_db')
+parser.add_argument('--kurucz_loggf_threshold', default=-3., help='log(gf) threshold for the kurucz dataset')
+parser.add_argument('--metastable_loggf_threshold', default=-3., help='log(gf) threshold for flagging levels that are connected by lines metastable')
+parser.add_argument('--include_zeta', action='store_true', default=False, help='include recombination coefficients (zeta)')
+parser.add_argument('--include_collision', action='store_true', default=False, help='include collision rates')
+parser.add_argument('--build_macro', action='store_true', default=False, help='build macro atom table into the file')
+parser.add_argument('--max_atomic_number', default=30, type=int, help=('Setting the maximum atomic number to be stored in the HDF5'
+            'file. For now 30 is the limit as I don\'t have reliable ionization data for anything above.'))
+parser.add_argument('--synpp_refs', help='point to the synpp_refs.dat')
+parser.add_argument('--include_ion_cx', action='store_true', default=False, help='include ionization cross sections (ion_cx)')
+
+atom_group = parser.add_mutually_exclusive_group()
+
+
+atom_group.add_argument('--exclude_atoms', nargs='+',
+                        help='exclude atoms to be added to the HDF5 (specify atomic_number)')
+
+atom_group.add_argument('--include_atoms', nargs='+',
+                        help='include atoms to be added to the HDF5 (specify atomic_number)')
+
+ion_group = parser.add_mutually_exclusive_group()
+
+ion_group.add_argument('--exclude_ions', nargs='+',
+                        help='exclude atoms to be added to the HDF5 (specify atomic_number)')
+
+ion_group.add_argument('--include_ions', nargs='+',
+                        help='include atoms to be added to the HDF5 (specify atomic_number)')
+
+
+
+args = parser.parse_args()
+
+config_dict = vars(args)
+
+ll = LevelsLines(config_dict)

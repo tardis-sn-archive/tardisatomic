@@ -7,6 +7,11 @@ import os
 
 import pandas as pd
 
+class TARDISAtomicError(Exception):
+    pass
+
+class MissingAtomicData(TARDISAtomicError):
+    pass
 
 class BasicAtomicData(object):
     """
@@ -16,8 +21,8 @@ class BasicAtomicData(object):
 
     __config = None
 
-    def __init__(self, confg_dict):
-        self.config = confg_dict
+    def __init__(self, config_dict):
+        self.config = config_dict
 
         try:
             self.load_data()
@@ -56,23 +61,24 @@ class BasicAtomicData(object):
         self.__config = value
 
 
-    def __get_sql_conn(self):
+    def _get_sql_conn(self):
         # get the SQL db
-        try:
-            sqlstr = self.config['SQL_ATOMIC_DB']
-            sqlconn = sqlite3.connect(sqlstr)
-            return sqlconn
-        except KeyError:
-            logging.critical('No atomic database given in the configuration')
-            raise
+        sql_fname = self.config['atom_db']
+
+        if not os.path.exists(sql_fname):
+            logging.critical('Atomic Database {0} does not exist'.format(sql_fname))
+            raise MissingAtomicData('Atomic Database {0} does not exist'.format(sql_fname))
+
+        return sqlite3.connect(sql_fname)
 
 
-class LoadLevelsAndLines(BasicAtomicData):
+
+class LevelsLines(BasicAtomicData):
     def load_data(self):
 
         # get the SQL db
 
-        self.sqlconn = self.__get_sql_conn()
+        self.sqlconn = self._get_sql_conn()
 
 
         levels_sql_stmt = 'select atom, ion, level_id, energy, g, source from levels '
@@ -105,7 +111,7 @@ class LoadLevelsAndLines(BasicAtomicData):
 
         lines_data_sql_stmt = (
             'select id, wavelength, atom, ion, f_ul, f_lu, loggf, level_id_lower, level_id_upper, source from lines')
-        lines_where_stmt = where_stmt.copy()
+        lines_where_stmt = where_stmt
         if lines_where_stmt != []:
             lines_data_sql_stmt += ' where %s' % ' and '.join(lines_where_stmt)
 
@@ -316,9 +322,10 @@ class LoadLevelsAndLines(BasicAtomicData):
 
 
     def save(self):
+
         with h5py.File(self.config['HDF5_FILE']) as hdf5_file:
-            hdf5_file['lines_data'] = self.lines_data.reset_index().to_records(index=False)
-            hdf5_file['levels_data'] = self.levels_data.reset_index().to_records(index=False)
+            self.lines_data.to_hdf(hdf5_file, 'lines')
+            self.levels_data.to_hdf(hdf5_file, 'levels')
 
 
 class ZetaData(BasicAtomicData):

@@ -1,11 +1,16 @@
 #!/usr/bin/env python
 import os
-from tardisatomic import construct_atom_db
 import argparse
+import sqlite3
+
+from tardisatomic import construct_atom_db
+import tardisatomic
+from tardisatomic.kurucz.io import read_gfall_raw, gfall_raw_2_db
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('dbname')
-parser.add_argument('gfall',help='Specify which gfall database the script should use.')
+parser.add_argument('gfall',help='Specify which gfall.dat to use.')
 args = parser.parse_args()
 
 if os.path.exists(args.dbname):
@@ -14,7 +19,27 @@ if os.path.exists(args.dbname):
     else:
         raise IOError('{0} exists -- aborting'.format(args.dbname))
 
-conn = construct_atom_db.new_linelist_from_gfall(args.dbname,gfall_fname=args.gfall)
+gfall_schema_path = os.path.join(os.path.dirname(tardisatomic.__file__), 'data',
+                                 'gfall.db3.schema')
+
+gfall_schema = file(gfall_schema_path).read()
+
+
+print "Reading File %s" % args.gfall
+
+gfall_raw =read_gfall_raw(args.gfall)
+
+
+conn = sqlite3.connect(args.dbname)
+conn.executescript(gfall_schema)
+
+print "Inserting data into the DB %s" % args.dbname
+
+gfall_raw_2_db(gfall_raw, conn)
+
+conn.commit()
+
+conn = construct_atom_db.new_linelist_from_gfall(args.dbname)
 conn = construct_atom_db.create_levels(conn)
 conn = construct_atom_db.link_levels(conn)
 conn = construct_atom_db.ion_xs(conn)

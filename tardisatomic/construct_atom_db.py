@@ -35,22 +35,18 @@ SET
 """
     
     
-def new_linelist_from_gfall(new_dbname, gfall_fname=None, select_atom=None):
+def new_linelist_from_gfall(new_dbname, select_atom=None):
     print "Reading lines from Kurucz gfall"
     conn = sqlite3.connect(new_dbname)
     conn.create_function('pow', 2, math.pow)
     conn.create_function('convert_air2vacuum', 1, convert_air2vacuum)
-    if gfall_fname is None:
-        gfall_fname = gfall_db
-    #attaching gfall database
-    conn.execute("attach '%s' as kurucz_lines" % gfall_fname)
     curs = conn.cursor()
-    curs.execute('drop table if exists lines')
     curs.execute(sql_stmts.linelist_create_stmt)
     if select_atom is None:
         elem_select_stmt = ""
     else:
         elem_select_stmt = " and elem in (%s)" % (','.join(map(str, select_atom)),)
+
     insert_fromgfall_stmt = sql_stmts.linelist_insert_stmt + sql_stmts.linelist_select_stmt % {'hc':hc, 'where_stmt':elem_select_stmt}
     
     if sqlparse_available:

@@ -14,7 +14,7 @@ SELECT
     label_lower,
     "kurucz"
 FROM
-    kurucz_lines.gfall
+    gfall
 """
 
 
