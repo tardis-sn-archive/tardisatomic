@@ -2,15 +2,18 @@ import time
 import re
 
 import numpy as np
+import pandas as pd
+
+from astropy import units as u
 
 def read_gfall_raw(fname):
     start_time = time.time()
     #FORMAT(F11.4,F7.3,F6.2,F12.3,F5.2,1X,A10,F12.3,F5.2,1X,A10,
     #3F6.2,A4,2I2,I3,F6.3,I3,F6.3,2I5,1X,A1,A1,1X,A1,A1,i1,A3,2I5,I6)
 
-    kurucz_fortran_format =('F11.4,F7.3,F6.2,F12.3,F5.2,1X,A10,F12.3,'
-                            'F5.2,1X,A10,F6.2,F6.2,F6.2,A4,I2,I2,I3,F6.3,I3,F6.3,'
-                            'I5,I5,1X,A1,A1,1X,A1,A1,I1,A3,I5,I5,I6')
+    kurucz_fortran_format =('F11.4,F7.3,F6.2,F12.3,F5.2,1X,A10,F12.3,F5.2,1X,'
+                            'A10,F6.2,F6.2,F6.2,A4,I2,I2,I3,F6.3,I3,F6.3,I5,I5,'
+                            '1X,I1,A1,1X,I1,A1,I1,A3,I5,I5,I6')
 
     number_match = re.compile(r'\d+(\.\d+)?')
     type_match = re.compile(r'[FIXA]')
@@ -23,9 +26,77 @@ def read_gfall_raw(fname):
 
     gfall = np.genfromtxt(fname, dtype=field_types, delimiter=field_widths,
                           skiprows=2)
+    columns = ['wavelength', 'loggf', 'element_code', 'e_first', 'j_first',
+               'blank1', 'label_first', 'e_second', 'j_second', 'blank2',
+               'label_second', 'log_gamma_rad', 'log_gamma_stark',
+               'log_gamma_vderwaals', 'ref', 'nlte_level_no_first',
+               'nlte_level_no_second', 'isotope', 'log_f_hyperfine',
+               'isotope2', 'log_iso_abundance', 'hyper_shift_first',
+               'hyper_shift_second', 'blank3', 'hyperfine_f_first',
+               'hyperfine_note_first', 'blank4', 'hyperfine_f_second',
+               'hyperfine_note_second', 'line_strength_class', 'line_code',
+               'lande_g_first', 'lande_g_second', 'isotopic_shift']
 
-    print "took %.2f seconds" % (time.time() - start_time)
+    gfall = pd.DataFrame(gfall)
+    gfall.columns = columns
+    print "took {0:.2f} seconds".format(time.time() - start_time)
     return gfall
+
+
+
+def parse_gfall(gfall_dataframe):
+
+    gfall_dataframe = gfall_dataframe.copy()
+
+    double_columns = [item.replace('_first', '') for item in gfall_dataframe.columns if
+                     item.endswith('first')]
+
+    # due to the fact that energy is stored in 1/cm
+    order_lower_upper = (gfall_dataframe.e_first.abs() <
+                         gfall_dataframe.e_second.abs())
+
+
+    for column in double_columns:
+        data = pd.concat([gfall_dataframe['{0}_first'.format(
+            column)][order_lower_upper], gfall_dataframe['{0}_second'.format(
+            column)][~order_lower_upper]])
+
+        gfall_dataframe['{0}_lower'.format(column)] = data
+
+        data = pd.concat([gfall_dataframe['{0}_first'.format(
+            column)][~order_lower_upper], gfall_dataframe['{0}_second'.format(
+            column)][order_lower_upper]])
+
+        gfall_dataframe['{0}_upper'.format(column)] = data
+
+
+        del gfall_dataframe['{0}_first'.format(column)]
+        del gfall_dataframe['{0}_second'.format(column)]
+
+    gfall_dataframe.e_lower = (gfall_dataframe.e_lower.values / u.cm).to(
+        u.eV, u.spectral()) #convert to eV
+    gfall_dataframe.e_upper = (gfall_dataframe.e_upper.values / u.cm).to(
+        u.eV, u.spectral()) #convert to eV
+
+
+
+
+    gfall_dataframe.wavelength *= 10
+
+    gfall_dataframe.label_lower = gfall_dataframe.label_lower.apply(
+        lambda x: x.strip())
+    gfall_dataframe.label_upper = gfall_dataframe.label_upper.apply(
+        lambda x: x.strip())
+
+    gfall_dataframe.e_lower_predicted = gfall_dataframe.e_lower < 0
+    gfall_dataframe.e_lower = gfall_dataframe.e_lower.abs()
+    gfall_dataframe.e_upper_predicted = gfall_dataframe.e_upper < 0
+    gfall_dataframe.e_upper = gfall_dataframe.e_upper.abs()
+    return gfall_dataframe
+
+
+
+
 
 def gfall_raw_2_db(gfall_raw, conn):
     insert_stmt_template = """insert into gfall(
