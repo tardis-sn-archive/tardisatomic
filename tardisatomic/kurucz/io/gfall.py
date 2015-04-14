@@ -227,7 +227,7 @@ def extract_lines(gfall_df, levels_df, selected_columns=None):
         level_lower_idx].values
     lines['level_number_upper'] = levels_df_idx.level_number.loc[
         level_upper_idx].values
-    
+
     return lines
 
 
