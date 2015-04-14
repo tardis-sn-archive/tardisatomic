@@ -118,7 +118,7 @@ def parse_gfall(gfall_df):
     gfall_df['atomic_number'] = gfall_df.element_code.astype(int)
     gfall_df['ion_number'] = (
         (gfall_df.element_code.values -
-         gfall_df.atomic_number.values) * 100).astype(int)
+         gfall_df.atomic_number.values) * 100).round().astype(int)
 
     del gfall_df['element_code']
 
@@ -155,26 +155,79 @@ def extract_levels(gfall_df, selected_columns=None):
                       'e_{0}_predicted':'theoretical'}
 
 
-    e_lower_levels = gfall_df.drop_duplicates(['atomic_number', 'ion_number',
-                                               'e_lower', 'g_lower',
-                                               'label_lower'])
-
-    e_lower_levels.rename(columns=dict([(key.format('lower'), value)
-        for key, value in column_renames.items()]), inplace=True)
+    e_lower_levels = gfall_df.rename(
+        columns=dict([(key.format('lower'), value)
+                      for key, value in column_renames.items()]))
 
 
-    e_upper_levels = gfall_df.drop_duplicates(['atomic_number', 'ion_number',
-                                               'e_lower', 'label_lower'])
 
-    e_upper_levels.rename(columns=dict([(key.format('upper'), value)
-        for key, value in column_renames.items()]), inplace=True)
+    e_upper_levels = gfall_df.rename(
+        columns=dict([(key.format('upper'), value)
+                      for key, value in column_renames.items()]))
 
     levels = pd.concat([e_lower_levels[selected_columns],
                         e_upper_levels[selected_columns]])
 
-    levels = levels.drop_duplicates(['atomic_number', 'ion_number',
-                                             'energy', 'g', 'label'])
 
+    levels = levels.drop_duplicates(['atomic_number', 'ion_number',
+                                             'energy', 'g', 'label']).sort(
+        ['atomic_number', 'ion_number', 'energy'])
+
+    levels_clean = levels.drop_duplicates(['atomic_number', 'ion_number',
+                                           'energy'])
+
+    levels_clean_level_number = levels_clean.groupby(
+        ['atomic_number', 'ion_number']).g.transform(
+        lambda x: np.arange(len(x))).values
+    levels_clean['level_number'] = levels_clean_level_number
+
+    levels_clean = levels_clean.set_index(
+        ['atomic_number', 'ion_number', 'energy'])
+
+    aie_index = [tuple(item)
+                 for item in levels[
+            ['atomic_number', 'ion_number', 'energy']].values.tolist()]
+
+    level_number = levels_clean.level_number.loc[aie_index]
+
+    levels['level_number'] = level_number.values
+    levels['level_id'] = np.arange(len(levels))
+
+    return levels
     
+
+def extract_lines(gfall_df, levels_df, selected_columns=None):
+
+    if selected_columns is None:
+        selected_columns = ['wavelength', 'atomic_number', 'ion_number']
+
+
+
+    if 'e_lower' not in gfall_df.columns:
+        raise ValueError('gfall dataframe needs to be parsed before this '
+                         'function can be used')
+
+    levels_df_idx = levels_df.set_index(['atomic_number', 'ion_number',
+                                         'energy', 'g', 'label'])
+
+    lines = gfall_df[selected_columns].copy()
+
+    level_lower_idx = gfall_df[['atomic_number', 'ion_number', 'e_lower',
+                                'g_lower', 'label_lower']].values.tolist()
+    level_lower_idx = [tuple(item) for item in level_lower_idx]
+
+    level_upper_idx = gfall_df[['atomic_number', 'ion_number', 'e_upper',
+                                'g_upper', 'label_upper']].values.tolist()
+    level_upper_idx = [tuple(item) for item in level_upper_idx]
+
+    lines['level_id_lower'] = levels_df_idx.level_id.loc[level_lower_idx].values
+    lines['level_id_upper'] = levels_df_idx.level_id.loc[level_upper_idx].values
+
+    lines['level_number_lower'] = levels_df_idx.level_number.loc[
+        level_lower_idx].values
+    lines['level_number_upper'] = levels_df_idx.level_number.loc[
+        level_upper_idx].values
+    
+    return lines
 
 
