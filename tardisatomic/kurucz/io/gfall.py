@@ -231,3 +231,5 @@ def extract_lines(gfall_df, levels_df, selected_columns=None):
     return lines
 
 
+def ingest_gfall(levels, lines, atomic_db):
+    pass
