@@ -19,10 +19,6 @@ class Atom(Base):
     group = Column(Integer)
     period = Column(Integer)
 
-
-
-
-
 class Isotope(Base):
     __tablename__ = "isotopes"
     id = Column(Integer, primary_key=True)
@@ -81,16 +77,11 @@ class Level(Base):
     ion = relationship("Ion", uselist=False, backref='levels')
     source = relationship('DataSource', backref='levels')
 
-
-
 class TransitionType(Base):
     __tablename__ = "transition_types"
     id = Column(Integer, primary_key=True)
     name = Column(String(150))
     comment = Column(String(150))
-
-
-
 
 class TransitionValueType(Base):
     __tablename__ = "transition_value_types"

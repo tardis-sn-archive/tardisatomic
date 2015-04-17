@@ -18,10 +18,11 @@ class AtomicDatabase(object):
         Base.metadata.create_all(self.engine)
         Base.metadata.bind = self.engine
         self.session = sessionmaker(bind=self.engine)()
-
-        self._init_empty_db()
+        if self.session.query(Atom).count()<100:
+            self._init_empty_db()
 
     def _init_empty_db(self):
+        print "Initializing the database"
         basic_atomic_data = pd.read_csv(basic_atomic_data_fname)
         atoms = []
         for i, row in basic_atomic_data.iterrows():
