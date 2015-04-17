@@ -1,3 +1,5 @@
+from astropy import units as u
+
 from sqlalchemy.ext.declarative import declarative_base
 
 from sqlalchemy import Column
@@ -18,6 +20,9 @@ class Atom(Base):
     symbol = Column(String(5))
     group = Column(Integer)
     period = Column(Integer)
+
+    def __repr__(self):
+        return "{0} Z={1}".format(self.name, self.atomic_number)
 
 class Isotope(Base):
     __tablename__ = "isotopes"
@@ -55,7 +60,8 @@ class Ion(Base):
     id = Column(Integer, primary_key=True)
     atom_id = Column(Integer, ForeignKey("atoms.id"))
     ion_number = Column(Integer)
-    ionization_energy_at_ground_level = Column(Float)
+    ionization_energy = Column(Float)
+    ionization_energy_unit = u.eV
 
     atom = relationship("Atom", uselist=False, backref='ions')
 
@@ -68,7 +74,6 @@ class Level(Base):
     level_number = Column(Integer)
     g = Column(Integer)
     energy = Column(Float)
-    ionization_energy = Column(Float)
     label = Column(String(120))
     theoretical = Column(Boolean)
     data_source_id = Column(Integer, ForeignKey('data_sources.id'))
@@ -120,6 +125,11 @@ class Transition(Base):
     transition_type = relationship("TransitionType", uselist=False,
                                    backref='transitions')
 
+    source_level = relationship(
+        "Level", primaryjoin=(Level.id==source_level_id), uselist=False)
+    target_level = relationship(
+        "Level", primaryjoin=(Level.id==target_level_id), uselist=False)
+
     source = relationship('DataSource', backref='transitions')
 
 
@@ -140,4 +150,14 @@ class DType(Base):
     name = Column(String(150))
 
 
+class Unit(Base):
+    __tablename__ = 'units'
+
+    @classmethod
+    def from_string(cls, unit_string, session):
+        parsed_unit_string =  str(u.Quantity(unit_string))
+        return blah
+
+    id = Column(Integer, primary_key=True)
+    unit = Column(String(150))
 

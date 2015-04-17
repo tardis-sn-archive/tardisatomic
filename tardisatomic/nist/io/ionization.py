@@ -4,6 +4,8 @@ from uncertainties import ufloat_fromstr
 
 from StringIO import StringIO
 
+from tardisatomic.alchemy import Ion
+
 import pandas as pd
 import numpy as np
 
@@ -69,3 +71,7 @@ def parse_ionization_data(ionization_df):
 
     del ionization_data['ionization_string']
     return ionization_data
+
+def ingest_ionization(ionization_data, atomic_db):
+    for i, row in ionization_data:
+        Ion()
