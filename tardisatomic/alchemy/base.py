@@ -80,7 +80,7 @@ class Level(Base):
 
 
     ion = relationship("Ion", uselist=False, backref='levels')
-    source = relationship('DataSource', backref='levels')
+    data_source = relationship('DataSource', backref='levels')
 
 class TransitionType(Base):
     __tablename__ = "transition_types"
@@ -110,6 +110,8 @@ class TransitionValue(Base):
 
     data_source_id = Column(Integer, ForeignKey("data_sources.id"))
 
+    transition_value_type = relationship('TransitionValueType', backref='transition_values')
+    data_source = relationship('DataSource', backref='transition_values')
     transition = relationship('Transition', backref='transition_value')
 
 
@@ -131,7 +133,7 @@ class Transition(Base):
     target_level = relationship(
         "Level", primaryjoin=(Level.id==target_level_id), uselist=False)
 
-    source = relationship('DataSource', backref='transitions')
+    data_source = relationship('DataSource', backref='transitions')
 
 
 class DataSource(Base):
