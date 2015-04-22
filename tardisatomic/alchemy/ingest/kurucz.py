@@ -50,7 +50,7 @@ class IngestGFAll(BaseIngest):
             _tmp.append(clevel)
             row['alchemy_level'] = clevel
 
-        levels['alchemy_leve'] = pd.Series(_tmp, index=levels.index)
+        levels['alchemy_level'] = pd.Series(_tmp, index=levels.index)
 
         for i, row in lines.iterrows():
             lowerlevel = levels.ix[row['level_id_lower']]['alchemy_level']
