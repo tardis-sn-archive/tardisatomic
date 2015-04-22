@@ -92,10 +92,11 @@ class TransitionValueType(Base):
     __tablename__ = "transition_value_types"
     id = Column(Integer, primary_key=True)
     name = Column(String(150))
-    unit = Column(String(150))
+    unit_id = Column(Integer, ForeignKey('units.id'))
     dtype_id = Column(Integer, ForeignKey("dtypes.id"))
 
     dtype = relationship('DType')
+    unit = relationship('Unit')
 
 
 class TransitionValue(Base):
@@ -149,14 +150,8 @@ class DType(Base):
     short_name = Column(String(10))
     name = Column(String(150))
 
-
 class Unit(Base):
     __tablename__ = 'units'
-
-    @classmethod
-    def from_string(cls, unit_string, session):
-        parsed_unit_string =  str(u.Quantity(unit_string))
-        return blah
 
     id = Column(Integer, primary_key=True)
     unit = Column(String(150))

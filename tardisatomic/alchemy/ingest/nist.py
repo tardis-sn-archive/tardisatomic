@@ -1,5 +1,4 @@
 from tardisatomic.alchemy.ingest import BaseIngest
-
 from tardisatomic.nist.io import download_ionization, parse_ionization_data
 from tardisatomic.alchemy import Ion, Atom
 

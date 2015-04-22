@@ -27,7 +27,7 @@ def download_ionization(spectra='h-uuu'):
 
 
     [s.extract() for s in bs_ion('a')]
-
+    a = 1
 
     return pd.read_table(StringIO(bs_ion('pre')[0].get_text()), delimiter='|',
                   comment='-', skiprows=3, names=['atomic_number',
