@@ -199,7 +199,7 @@ def extract_levels(gfall_df, selected_columns=None):
 def extract_lines(gfall_df, levels_df, selected_columns=None):
 
     if selected_columns is None:
-        selected_columns = ['wavelength', 'atomic_number', 'ion_number']
+        selected_columns = ['wavelength','loggf' , 'atomic_number', 'ion_number']
 
 
 
