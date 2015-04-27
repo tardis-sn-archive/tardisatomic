@@ -59,11 +59,16 @@ class Ion(Base):
     __tablename__ = "ions"
     id = Column(Integer, primary_key=True)
     atom_id = Column(Integer, ForeignKey("atoms.id"))
+    data_source_id = Column(Integer, ForeignKey("data_sources.id"))
     ion_number = Column(Integer)
     ionization_energy = Column(Float)
     ionization_energy_unit = u.eV
 
+    data_source = relationship('DataSource', backref='ions')
     atom = relationship("Atom", uselist=False, backref='ions')
+
+    def __repr__(self):
+        return "{0} Ion={1}".format(self.__tablename__, self.ion_number)
 
 
 class Level(Base):
@@ -81,6 +86,9 @@ class Level(Base):
 
     ion = relationship("Ion", uselist=False, backref='levels')
     data_source = relationship('DataSource', backref='levels')
+
+    def __repr__(self):
+        return "{0} level_number={1}".format(self.__tablename__, self.level_number)
 
 class TransitionType(Base):
     __tablename__ = "transition_types"
