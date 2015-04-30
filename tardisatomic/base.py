@@ -15,13 +15,14 @@ class AtomicDatabase(object):
 
     def __init__(self, db_url):
         self.engine = create_engine(db_url)
-        Base.metadata.create_all(self.engine)
+        #Base.metadata.create_all(self.engine)
         Base.metadata.bind = self.engine
         self.session = sessionmaker(bind=self.engine)()
 
-        if self.session.query(Atom).count() < 118:
+        if self.session.query(Atom).count< 118:
+            raise
+            print("Database is not empty!" )
             self._init_empty_db()
-
     def _init_empty_db(self):
         print "Initializing the database"
         basic_atomic_data = pd.read_csv(basic_atomic_data_fname)
@@ -32,6 +33,7 @@ class AtomicDatabase(object):
                               period=row['period']))
 
         self.session.commit()
+
 
 
 

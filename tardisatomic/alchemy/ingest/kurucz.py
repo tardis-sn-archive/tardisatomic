@@ -17,7 +17,7 @@ class IngestGFAll(BaseIngest):
 
     def _convert_air_to_vacuum(self, wavelength):
         if wavelength > 2000:
-            return convert_air_to_vacuum(self)
+            return convert_air_to_vacuum(wavelength)
         else:
             return wavelength
 
@@ -69,9 +69,9 @@ class IngestGFAll(BaseIngest):
             cion_number = int(row['ion_number'])
             level_number_lower = int(row['level_number_lower'])
             level_number_upper = int(row['level_number_upper'])
-            print(
-            'atom: {0}, ion: {1}, level_l: {2}, level_u: {3})'.format(catom_number, cion_number, level_number_lower,
-                                                                      level_number_upper))
+            #print(
+            #'atom: {0}, ion: {1}, level_l: {2}, level_u: {3})'.format(catom_number, cion_number, level_number_lower,
+            #                                                          level_number_upper))
             lowerlevel = indexed_levels.loc[catom_number, cion_number, level_number_lower]['alchemy_level'].values[0]
             upperlevel = indexed_levels.loc[catom_number, cion_number, level_number_upper]['alchemy_level'].values[0]
             clineT = Transition(transition_type=transition_type_line, source_level=upperlevel,

@@ -8,6 +8,9 @@ from sqlalchemy.orm import relationship
 
 from sqlalchemy import Integer, Float, String, Boolean, ForeignKey
 
+from sqlalchemy import UniqueConstraint
+
+
 Base = declarative_base()
 
 
@@ -86,6 +89,9 @@ class Level(Base):
 
     ion = relationship("Ion", uselist=False, backref='levels')
     data_source = relationship('DataSource', backref='levels')
+
+    #__table_args__ = (UniqueConstraint('level_number', 'label' ,'energy', 'ion_id' ,'data_source_id',  name='_level_uc'),
+    #                 )
 
     def __repr__(self):
         return "{0} level_number={1}".format(self.__tablename__, self.level_number)
