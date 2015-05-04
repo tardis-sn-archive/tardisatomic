@@ -1,3 +1,5 @@
+from tardis.atomic import plugins as atomic_plugins
+
 from tardisatomic.alchemy import Ion, Atom, Level, Transition, TransitionType, \
     TransitionValue, TransitionValueType
 
@@ -5,26 +7,92 @@ from sqlalchemy.orm import aliased
 import pandas as pd
 import numpy as np
 
+from abc import ABCMeta, abstractproperty, abstractmethod
 
-class CreateHd5(object):
-    def __init__(self, atomic_db, hd5_filename):
+
+class BaseAtomicDatabase(object)
+    __metaclass__ = ABCMeta
+
+    def _to_data_frame(self, sql_data):
+        rec_data = [rec.__dict__ for rec in sql_data]
+        return pd.DataFrame.from_records(rec_data)
+
+
+class Atoms(atomic_plugins.Atoms, BaseAtomicDatabase):
+
+    def __init__(self, **kwargs):
+        self.exclude_species = kwargs.get('exclude_species', [])
+
+    def load_sql(self):
+        atomic_data = self.atomic_db.session.query(Atom).order_by(
+            Atom.atomic_number).all()
+        self.data = self._to_data_frame(atomic_data)
+
+
+
+class Ions(DB2HDF):
+
+    hdf_name = 'ions'
+
+    def __init__(self, **kwargs):
+        self.exclude_species = kwargs.get('exclude_species', [])
+        self.max_ionization_energy = kwargs.get('max_ionization_energy', np.inf)
+
+
+    def load_sql(self):
+        ion_data = self.atomic_db.session.query(Ion, Atom).join("atom").values(
+            Atom.atomic_number, Ion.ion_number,
+            Ion.ionization_energy)
+        self.data = self._to_data_frame(ion_data)
+
+
+    def to_hdf(self, file_or_buf):
+        raise NotImplementedError()
+
+
+class Levels(DB2HDF):
+
+    hdf_name = 'levels'
+
+    def __init__(self, exclude_species=[], max_ionization_energy=np.inf):
+        self.exclude_species = exclude_species
+        self.max_ionization_energy = max_ionization_energy
+
+    def load_sql(self):
+        self.data = None
+
+    def to_hdf(self, file_or_buf):
+        raise NotImplementedError()
+
+
+
+class Lines(DB2HDF):
+
+    hdf_name = 'lines'
+
+    def __init__(self, exclude_species=[], ):
+
+
+class CreateHDF(object):
+
+    format_version = 'v2.0'
+
+    def __init__(self, atomic_db, hd5_filename, writers=[Levels, ], **kwargs):
+
+        self.writers = [item(**kwargs) for item in writers]
+
         self.atomic_db = atomic_db
 
 
     def load_data(self):
-        pass
+        for writer in self.writers:
+            writer.load_sql()
+
+
 
 
     def _load_atoms(self):
-        atomic_data = self.atomic_db.session.query(Atom).order_by(
-            Atom.atomic_number).all()
-        self.atom_data = self._to_data_frame(atomic_data)
 
-    def _load_ions(self):
-        ion_data = self.atomic_db.session.query(Ion, Atom).join("atom").values(
-            Atom.atomic_number, Ion.ion_number,
-            Ion.ionization_energy)
-        self.ion_data = self._to_data_frame(ion_data)
 
     def _load_transitions(self):
         target_level = aliased(Level)
@@ -101,11 +169,9 @@ class CreateHd5(object):
                                   Level.level_number, Level.g, Level.energy)
         self.level_data = self._to_data_frame(level_data)
 
-    def _to_data_frame(self, sql_data):
-        rec_data = [rec.__dict__ for rec in sql_data]
-        return pd.DataFrame.from_records(rec_data)
 
     def _to_hd5(self):
+        for write in self.writers:
 
         hdf = pd.HDFStore('atomic_data.h5')
         hdf.put('levels',self.level_data, format='table', data_columns=True)
