@@ -18,7 +18,7 @@ import gnupg
 class BaseAtomicDatabase(object):
     __metaclass__ = ABCMeta
 
-    atomic_db = None
+    atomic_db_sql = None
 
     def _to_data_frame(self, sql_data):
         rec_data = [rec.__dict__ for rec in sql_data]
@@ -26,8 +26,8 @@ class BaseAtomicDatabase(object):
 
     # ToDO:Finish that
 
-    @atomic_db.setter
-    def atomic_db(self, value):
+    @atomic_db_sql.setter
+    def atomic_db_sql(self, value):
         self.atomic_db = value
 
 
@@ -139,13 +139,13 @@ class Lines(atomic_plugins.Lines, BaseAtomicDatabase):
         self.data = self.line_transitions
 
 
-class CreateHDF
+class CreateHDF(object):
     def close_hdf(self, hdf_buf, anonymous=False):
         if not anonymous:
             uname = platform.uname()
             user = os.getusername()
         else:
-            uname = 'anonymous'(object):
+            uname = 'anonymous'(object)
     def __init__(self, atom_db, hdf_file_or_buf, exclude_species=[],
                  max_ionization_level=np.inf, \
                  transition_types=['lines']):
@@ -203,9 +203,9 @@ class CreateHDF
         gpg = gnupg.GPG()
         gpg.encoding = 'utf-8'
 
-        hdf_buf.put('metadata/system', uname)
-        hdf_buf.put('metadata/username', user)
-        hdf_buf.put('metadata/creation_time', ctime)
+        self.hdf_buf.put('metadata/system', uname)
+        self.hdf_buf.put('metadata/username', user)
+        self.hdf_buf.put('metadata/creation_time', ctime)
 
         for dataset in hdf_buf.values():
             md5_hash.update(dataset.value.data)
