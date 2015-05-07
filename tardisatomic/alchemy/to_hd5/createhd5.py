@@ -140,6 +140,7 @@ class Lines(atomic_plugins.Lines, BaseAtomicDatabase):
 
 
 class CreateHDF(object):
+<<<<<<< HEAD
     def close_hdf(self, hdf_buf, anonymous=False):
         if not anonymous:
             uname = platform.uname()
@@ -149,6 +150,13 @@ class CreateHDF(object):
     def __init__(self, atom_db, hdf_file_or_buf, exclude_species=[],
                  max_ionization_level=np.inf, \
                  transition_types=['lines']):
+=======
+
+    atomic_database_version = 'v2'
+
+
+    def __init__(self, atom_db, hdf_file_or_buf, data_types, **kwargs):
+>>>>>>> upstream/general/restructure
         """
         Creates the HDF file for TARDIS from the atomic database.
 
@@ -171,32 +179,40 @@ class CreateHDF(object):
         self.exclude_species = exclude_species
         self.max_ionization_level = max_ionization_level
         self.transition_types = transition_types
+        self.data_type_dict = self._create_atomic_data_type_dict()
+
+        data_type_dict = self._create_atomic_data_type_dict()
 
         atomic_plugins = self.__create_atomic_objects()
 
 
-    def __create_atomic_objects(self):
-
-        atomic_plugins = {x.hdf_name: x(exclude_species=self.exclude_species,
-                                        max_ionization_level=
-                                        self.max_ionization_level,
-                                        transition_types=self.transition_types
-                                        ) for x in
+    @staticmethod
+    def _create_atomic_data_type_dict():
+        return {x.hdf_name: x for x in
                           BaseAtomicDatabase.__subclasses__()}
 
-        return atomic_plugins
+    def _create_atomic_objects(self, atomic_data_types, data_type_dict,
+                               **kwargs):
+        data_types = []
 
-    def __load_atomic_data(self, atomic_plugins):
+        for key in atomic_data_types:
+            data_types.append(data_type_dict[key](**kwargs))
+
+        return data_types
+
+    def _load_atomic_data(self, atomic_plugins):
 
         for key in atomic_plugins:
-            try:
-                atomic_plugins[key].load_sql()
-            except:
-                print("Unexpected error in {0}: {1} ".format(key,
-                                                             sys.exc_info()[0]))
+            self._value = atomic_plugins[key].load_sql()
 
-
+    def close_hdf(self, hdf_buf, anonymous=False):
+        if not anonymous:
+            uname = platform.uname()
+            user = os.getusername()
+        else:
+            uname = 'anonymous'
             user = 'anonymous'
+
         ctime = strftime("%Y-%m-%d %H:%M:%S", gmtime())
         md5_hash = hashlib.md5()
 
