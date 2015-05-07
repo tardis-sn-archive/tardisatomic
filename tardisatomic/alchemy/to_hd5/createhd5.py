@@ -140,23 +140,11 @@ class Lines(atomic_plugins.Lines, BaseAtomicDatabase):
 
 
 class CreateHDF(object):
-<<<<<<< HEAD
-    def close_hdf(self, hdf_buf, anonymous=False):
-        if not anonymous:
-            uname = platform.uname()
-            user = os.getusername()
-        else:
-            uname = 'anonymous'(object)
-    def __init__(self, atom_db, hdf_file_or_buf, exclude_species=[],
-                 max_ionization_level=np.inf, \
-                 transition_types=['lines']):
-=======
 
     atomic_database_version = 'v2'
 
 
     def __init__(self, atom_db, hdf_file_or_buf, data_types, **kwargs):
->>>>>>> upstream/general/restructure
         """
         Creates the HDF file for TARDIS from the atomic database.
 
