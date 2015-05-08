@@ -6,6 +6,7 @@ from tardisatomic.kurucz.io import (read_gfall_raw, parse_gfall,
                                     extract_levels, extract_lines)
 from tardisatomic.util import convert_air_to_vacuum
 import pandas as pd
+import numpy as np
 
 import ipdb
 
@@ -21,7 +22,7 @@ class IngestGFAll(BaseIngest):
         else:
             return wavelength
 
-    def ingest(self, fname):
+    def ingest(self, fname, exclude_atoms=[]):
         gfall = read_gfall_raw(fname)
         gfall_parsed = parse_gfall(gfall)
         levels = extract_levels(gfall_parsed)
@@ -46,11 +47,13 @@ class IngestGFAll(BaseIngest):
         self.atomic_db.session.add(value_type_loggf)
         self.atomic_db.session.commit()
 
+        include_atoms = list(set(np.arange(0, 30)) - set(exclude_atoms))
         levels['alchemy_level'] = 0
+        levels = levels.ix[levels['atomic_number'].isin(include_atoms)]
         _tmp = []
         for i, row in levels.iterrows():
             ion = self._find_ion(row['atomic_number'], row['ion_number'])
-            clevel = Level(ion = ion,
+            clevel = Level(ion=ion,
                            level_number=row['level_number'], g=row['g'],
                            energy=row['energy'], label=row['label'],
                            theoretical=row['theoretical'],
@@ -64,23 +67,38 @@ class IngestGFAll(BaseIngest):
         levels['level_number'] = levels['level_number'].astype(int)
         indexed_levels = levels.set_index(['atomic_number', 'ion_number', 'level_number'])
 
+        lines = lines.ix[lines['atomic_number'].isin(include_atoms)]
         for i, row in lines.iterrows():
             catom_number = int(row['atomic_number'])
             cion_number = int(row['ion_number'])
             level_number_lower = int(row['level_number_lower'])
             level_number_upper = int(row['level_number_upper'])
-            #print(
-            #'atom: {0}, ion: {1}, level_l: {2}, level_u: {3})'.format(catom_number, cion_number, level_number_lower,
-            #                                                          level_number_upper))
-            lowerlevel = indexed_levels.loc[catom_number, cion_number, level_number_lower]['alchemy_level'].values[0]
-            upperlevel = indexed_levels.loc[catom_number, cion_number, level_number_upper]['alchemy_level'].values[0]
-            clineT = Transition(transition_type=transition_type_line, source_level=upperlevel,
-                                target_level=lowerlevel, data_source=data_source_ku)
+            # print(
+            # 'atom: {0}, ion: {1}, level_l: {2}, level_u: {3})'.format(
+            # catom_number, cion_number, level_number_lower,
+            #
+            # level_number_upper))
+            lowerlevel = \
+                indexed_levels.loc[
+                    catom_number, cion_number, level_number_lower][
+                    'alchemy_level'].values[0]
+            upperlevel = \
+                indexed_levels.loc[
+                    catom_number, cion_number, level_number_upper][
+                    'alchemy_level'].values[0]
+            clineT = Transition(transition_type=transition_type_line,
+                                source_level=upperlevel,
+                                target_level=lowerlevel,
+                                data_source=data_source_ku)
 
-            clinegf = TransitionValue(transition=clineT, transition_value_type=value_type_loggf,
-                                      value=row['loggf'], data_source=data_source_ku)
+            clinegf = TransitionValue(transition=clineT,
+                                      transition_value_type=value_type_loggf,
+                                      value=row['loggf'],
+                                      data_source=data_source_ku)
             vacum_wl = self._convert_air_to_vacuum(row['wavelength'])
-            clinewl = TransitionValue(transition=clineT, transition_value_type=value_type_wl, value=vacum_wl,
+            clinewl = TransitionValue(transition=clineT,
+                                      transition_value_type=value_type_wl,
+                                      value=vacum_wl,
                                       data_source=data_source_ku)
             self.atomic_db.session.add(lowerlevel)
             self.atomic_db.session.add(upperlevel)
