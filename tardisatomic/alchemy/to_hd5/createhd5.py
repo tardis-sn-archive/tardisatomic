@@ -270,20 +270,20 @@ class CreateHDF(object):
         gpg = gnupg.GPG()
         gpg.encoding = 'utf-8'
 
-        self.hdf_buf.put('metadata/system', uname)
-        self.hdf_buf.put('metadata/username', user)
-        self.hdf_buf.put('metadata/creation_time', ctime)
+        self.hdf_buf.put('metadata/system', pd.Series(uname))
+        self.hdf_buf.put('metadata/username', pd.Series(user))
+        self.hdf_buf.put('metadata/creation_time', pd.Series(ctime))
 
-        for dataset in self.hdf_buf.values():
-            md5_hash.update(dataset.value.data)
+        for key  in self.hdf_buf.keys():
+            md5_hash.update(str(self.hdf_buf[key].values))
 
         data_to_sign = "TARDISATOMIC\n" "creation_time: " + ctime + "\n" + \
                        "System:\n" + \
-                       uname + "\n" + "User: " \
+                       str(uname) + "\n" + "User: " \
                                       "" + \
-                       user + "\n" + "md5: " + md5_hash + "\n"
+                       user + "\n" + "md5: " + md5_hash.hexdigest() + "\n"
         signed_data = gpg.sign(data_to_sign)
 
-        self.hdf_buf.put('metadata/gpg', signed_data.data)
-        self.hdf_buf.put('metadata/md5', md5_hash.hexdigest())
+        self.hdf_buf.put('metadata/gpg', pd.Series(signed_data.data))
+        self.hdf_buf.put('metadata/md5', pd.Series(md5_hash.hexdigest()))
         self.hdf_buf.close()
