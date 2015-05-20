@@ -64,9 +64,9 @@ def test_atoms_db(atomic_database):
 
 def test_ions(raw_ions, atomic_database):
     ionization_string = \
-    raw_ions.set_index(['atomic_number', 'ion_number']).ix[(1,
-                                                            0)][
-        'ionization_string'].strip()
+        raw_ions.set_index(['atomic_number', 'ion_number']).ix[(1,
+                                                                0)][
+            'ionization_string'].strip()
     energy = float(re.findall("\d+.\d+", ionization_string)[0])
 
     testing.assert_almost_equal(energy, 13.5984, decimal=3)

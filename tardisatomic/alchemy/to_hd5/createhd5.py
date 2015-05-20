@@ -69,7 +69,7 @@ class Ions(atomic_plugins.Ions, BaseAtomicDatabase):
         except:
             "No drop in Ions!"
 
-        a =1
+        a = 1
 
 
 class Levels(atomic_plugins.Levels, BaseAtomicDatabase):
@@ -86,7 +86,7 @@ class Levels(atomic_plugins.Levels, BaseAtomicDatabase):
             self.data.drop('_labels', 1, inplace=True)
         except:
             "No drop in Levels!"
-        a =1
+        a = 1
 
 
 # ToDo: Change the super class tin TARDIS!!
@@ -174,7 +174,7 @@ class Lines(atomic_plugins.Lines, BaseAtomicDatabase):
         self.data['loggf'] = self.data['loggf'].apply(lambda x: float(x))
         self.data['wavelength'] = self.data['wavelength'].apply(lambda x:
                                                                 float(x))
-        a =1
+        a = 1
 
 class CreateHDF(object):
     atomic_database_version = 'v2'
