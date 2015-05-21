@@ -6,7 +6,6 @@ from time import gmtime, strftime
 
 import numpy as np
 
-from pandas import HDFStore
 from tardis.atomic import plugins as atomic_plugins
 from tardisatomic.alchemy import Ion, Atom, Level, Transition, TransitionType, \
     TransitionValue, TransitionValueType
@@ -17,12 +16,22 @@ import gnupg
 
 class BaseAtomicDatabase(object):
     __metaclass__ = ABCMeta
-
     _atomic_db_sql = None
 
     def _to_data_frame(self, sql_data):
         rec_data = [rec.__dict__ for rec in sql_data]
         return pd.DataFrame.from_records(rec_data)
+
+    def _filter_by__atomic_numbers(self, exclude_species):
+        _atomic_numbers = list(np.arange(1, 31))
+        include_species = list(set(_atomic_numbers) - set(
+            exclude_species))
+        self.data = self.data.ix[
+            self.data['atomic_number'].isin(include_species)]
+
+    def _filterby_max_ion_level(self, max_ion_level):
+        self.data = self.data.ix[self.data['ion_number'] < max_ion_level]
+
 
     # ToDO:Finish that
 
@@ -51,13 +60,13 @@ class Atoms(atomic_plugins.Atoms, BaseAtomicDatabase):
         # To avoid the unicode Problem in hdf and python 2.7
         self.data['name'] = self.data['name'].apply(lambda x: str(x))
         self.data['symbol'] = self.data['symbol'].apply(lambda x: str(x))
-
+        self._filter_by__atomic_numbers(self.exclude_species)
 
 
 class Ions(atomic_plugins.Ions, BaseAtomicDatabase):
     def __init__(self, **kwargs):
         self.exclude_species = kwargs.get('exclude_species', [])
-        self.max_ionization_energy = kwargs.get('max_ionization_energy', np.inf)
+        self.max_ionization_level = kwargs.get('max_ionization_level', np.inf)
 
     def load_sql(self):
         ion_data = self.atomic_db.session.query(Ion, Atom).join("atom").values(
@@ -69,13 +78,15 @@ class Ions(atomic_plugins.Ions, BaseAtomicDatabase):
         except:
             "No drop in Ions!"
 
+        self._filter_by__atomic_numbers(self.exclude_species)
+        self._filterby_max_ion_level(self.max_ionization_level)
         a = 1
 
 
 class Levels(atomic_plugins.Levels, BaseAtomicDatabase):
     def __init__(self, **kwargs):
         self.exclude_species = kwargs.get('exclude_species', [])
-        self.max_ionization_energy = kwargs.get('max_ionization_energy', np.inf)
+        self.max_ionization_level = kwargs.get('max_ionization_level', np.inf)
 
     def load_sql(self):
         level_data = self.atomic_db.session.query(Level, Ion, Atom).join(
@@ -86,6 +97,8 @@ class Levels(atomic_plugins.Levels, BaseAtomicDatabase):
             self.data.drop('_labels', 1, inplace=True)
         except:
             "No drop in Levels!"
+        self._filter_by__atomic_numbers(self.exclude_species)
+        self._filterby_max_ion_level(self.max_ionization_level)
         a = 1
 
 
@@ -93,8 +106,9 @@ class Levels(atomic_plugins.Levels, BaseAtomicDatabase):
 class Lines(atomic_plugins.Lines, BaseAtomicDatabase):
     def __init__(self, **kwargs):
         self.exclude_species = kwargs.get('exclude_species', [])
-        self.max_ionization_energy = kwargs.get('max_ionization_energy', np.inf)
+        self.max_ionization_level = kwargs.get('max_ionization_level', np.inf)
         self.transition_types = kwargs.get('transition_types', ['lines'])
+        self.max_loggf = kwargs.get('transition_types', -3)
 
     def load_sql(self):
         target_level = aliased(Level)
@@ -174,6 +188,10 @@ class Lines(atomic_plugins.Lines, BaseAtomicDatabase):
         self.data['loggf'] = self.data['loggf'].apply(lambda x: float(x))
         self.data['wavelength'] = self.data['wavelength'].apply(lambda x:
                                                                 float(x))
+        self.data = self.data.ix[self.data['loggf'] < self.max_loggf]
+        self._filter_by__atomic_numbers(self.exclude_species)
+        self._filterby_max_ion_level(self.max_ionization_level)
+
         a = 1
 
 class CreateHDF(object):
@@ -202,6 +220,7 @@ class CreateHDF(object):
         self.exclude_species = kwargs.get('exclude_species', None)
         self.max_ionization_level = kwargs.get('max_ionization_level', None)
         self.transition_types = kwargs.get('transition_types', None)
+        self.max_loggf = kwargs.get('transition_types', -3)
 
         self.hdf_buf = self._open_hdf_buf(hdf_file)
 
@@ -220,8 +239,7 @@ class CreateHDF(object):
             print "file does exist at this time. Create new HDF file."
             return pd.HDFStore(fname, 'w')
         else:
-            print "Error: File hdf exist"
-            raise
+            raise IOError("File hdf exist")
 
     @staticmethod
     def _create_atomic_data_type_dict():
